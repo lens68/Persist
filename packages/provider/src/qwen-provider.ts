@@ -31,11 +31,9 @@ export class QwenProvider implements ChatProvider {
   async *chat(request: ChatRequest): AsyncIterable<RuntimeChunk> {
     const startedAt = Date.now();
     const model = request.model ?? this.defaultModel;
-    let assistantMessageId: string | undefined;
     let content = '';
 
     const messageId = crypto.randomUUID();
-    assistantMessageId = messageId;
 
     yield {
       type: 'message-start',
@@ -112,7 +110,7 @@ export class QwenProvider implements ChatProvider {
         yield {
           type: 'text-delta',
           sessionId: request.sessionId,
-          messageId: assistantMessageId,
+          messageId,
           timestamp: new Date(),
           delta: text,
         };
@@ -132,7 +130,7 @@ export class QwenProvider implements ChatProvider {
         yield {
           type: 'usage',
           sessionId: request.sessionId,
-          messageId: assistantMessageId,
+          messageId,
           timestamp: new Date(),
           usage,
         };
@@ -142,7 +140,7 @@ export class QwenProvider implements ChatProvider {
     yield {
       type: 'message-end',
       sessionId: request.sessionId,
-      messageId: assistantMessageId!,
+      messageId,
       timestamp: new Date(),
       content,
     };
@@ -159,7 +157,7 @@ export class QwenProvider implements ChatProvider {
     yield {
       type: 'done',
       sessionId: request.sessionId,
-      messageId: assistantMessageId,
+      messageId,
       completionState: 'completed',
       timestamp: new Date(),
       providerMetadata,

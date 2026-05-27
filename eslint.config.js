@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/.next/**',
       '**/node_modules/**',
       '**/coverage/**',
+      'apps/web/next-env.d.ts',
       'AGENTS.md',
       'docs/**',
     ],
