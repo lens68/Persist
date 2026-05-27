@@ -1,9 +1,14 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { QwenProvider } from '@persist/provider';
 import { createDatabase, SqliteSessionStore } from '@persist/storage';
 import { registerRoutes } from './routes.js';
+
+// Load monorepo root .env when running from apps/api (pnpm dev).
+loadEnv({ path: resolve(dirname(fileURLToPath(import.meta.url)), '../../../.env') });
 
 const port = Number(process.env.API_PORT ?? 3001);
 const databaseUrl = process.env.DATABASE_URL ?? 'file:./.data/persist.db';
