@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Publish GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse version
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Release tag: ${TAG} (version ${VERSION})"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prettier check
+        run: pnpm run format:check
+
+      - name: ESLint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm test
+        env:
+          DASHSCOPE_API_KEY: ci-placeholder-not-a-real-key
+
+      - name: Build all packages
+        run: pnpm run build
+        env:
+          DASHSCOPE_API_KEY: ci-placeholder-not-a-real-key
+
+      - name: Package release artifacts
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          mkdir -p release-bundle/api release-bundle/packages
+
+          cp -r apps/api/dist/. release-bundle/api/
+          cp -r packages/shared/dist release-bundle/packages/shared
+          cp -r packages/runtime/dist release-bundle/packages/runtime
+          cp -r packages/provider/dist release-bundle/packages/provider
+          cp -r packages/storage/dist release-bundle/packages/storage
+
+          (cd release-bundle && zip -r "../persist-${TAG}-runtime-packages.zip" packages)
+          (cd release-bundle/api && zip -r "../../persist-${TAG}-api.zip" .)
+
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BODY=$(awk -v ver="${VERSION}" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -z "$BODY" ]; then
+            echo "No changelog section found for version ${VERSION}" >&2
+            exit 1
+          fi
+
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Persist ${{ steps.version.outputs.tag }}
+          body: ${{ steps.changelog.outputs.body }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          files: |
+            persist-${{ steps.version.outputs.tag }}-runtime-packages.zip
+            persist-${{ steps.version.outputs.tag }}-api.zip
+          fail_on_unmatched_files: true

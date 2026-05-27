@@ -39,7 +39,10 @@ pnpm test
 ## CI/CD
 
 - **CI**（`.github/workflows/ci.yml`）：`format:check` → `lint` → `typecheck` → `test` → `build`
-- **CD**（`.github/workflows/cd.yml`）：`main` 上 CI 通过后上传构建产物（Artifacts）
+- **CD**（`.github/workflows/cd.yml`）：`main` 上 CI 通过后上传 Actions Artifacts
+- **Release**（`.github/workflows/release.yml`）：推送 tag `v*.*.*` 时自动质检、构建并发布 [GitHub Release](https://github.com/lens68/Persist/releases)
+
+版本记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## API（v0.1）
 
