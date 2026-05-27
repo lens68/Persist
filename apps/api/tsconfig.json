@@ -5,5 +5,11 @@
     "rootDir": "./src",
     "noEmit": false
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/provider" },
+    { "path": "../../packages/runtime" },
+    { "path": "../../packages/storage" }
+  ]
 }

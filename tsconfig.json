@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/provider" },
+    { "path": "./packages/runtime" },
+    { "path": "./packages/storage" },
+    { "path": "./apps/api" }
+  ]
+}

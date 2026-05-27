@@ -49,8 +49,8 @@ jobs:
           # CI uses mocked provider tests; no real API keys.
           DASHSCOPE_API_KEY: ci-placeholder-not-a-real-key
 
-      - name: Build all packages
-        run: pnpm run build
+      - name: Build apps (packages built during typecheck)
+        run: pnpm --filter @persist/api --filter @persist/web run build
 
   # Gate: downstream CD only runs when quality job succeeds on main.
   ci-success:

@@ -5,7 +5,8 @@
   "version": "0.1.0",
   "description": "Persistent Runtime — Stateful Agent Runtime substrate",
   "scripts": {
-    "build": "pnpm -r run build",
+    "build": "pnpm -r --sort run build",
+    "build:packages": "pnpm --filter \"./packages/**\" -r --sort run build",
     "dev": "pnpm --filter @persist/api dev",
     "dev:web": "pnpm --filter @persist/web dev",
     "test": "vitest run",
@@ -14,7 +15,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm run build:packages && pnpm -r run typecheck"
   },
   "engines": {
     "node": ">=20"
