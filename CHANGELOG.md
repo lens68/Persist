@@ -44,7 +44,7 @@
 
 ### Fixed
 
-- CD/Release：`upload-artifact@v4` 默认遵循 `.gitignore`，导致 `dist/`、`.next/` 无法上传；改为 staging 至 `.ci-artifacts/` 后再发布
+- CD/Release：`upload-artifact@v4` 遵循 `.gitignore`，`dist/`、`.next/` 路径会被排除；staging 时扁平化目录并改用 `web-next/`（无 `.next` 路径段），且 staging 根目录 `artifact-output/` 不加入 gitignore
 
 ### Architecture
 

@@ -5,3 +5,5 @@ coverage
 pnpm-lock.yaml
 AGENTS.md
 docs
+artifact-output
+.ci-artifacts

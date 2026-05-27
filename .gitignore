@@ -12,8 +12,7 @@ coverage/
 *.log
 .data/
 *.tsbuildinfo
-.ci-artifacts/
 
-# Local governance docs (not published to GitHub)
+# artifact-output/ is intentionally NOT gitignored — upload-artifact v4 reads .gitignore
 AGENTS.md
 docs/

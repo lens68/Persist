@@ -65,15 +65,22 @@ jobs:
         run: pnpm run build
         env:
           DASHSCOPE_API_KEY: ci-placeholder-not-a-real-key
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Verify build outputs
+        run: |
+          test -d apps/api/dist
+          test -d apps/web/.next
+          test -f apps/web/.next/BUILD_ID
 
       - name: Stage and package release artifacts
         run: |
           TAG="${{ steps.version.outputs.tag }}"
-          bash .github/scripts/stage-artifacts.sh .ci-artifacts
+          bash .github/scripts/stage-artifacts.sh artifact-output
 
-          (cd .ci-artifacts && zip -r "../persist-${TAG}-runtime-packages.zip" packages)
-          (cd .ci-artifacts/api && zip -r "../../persist-${TAG}-api.zip" .)
-          (cd .ci-artifacts/web && zip -r "../../persist-${TAG}-web-next.zip" .next)
+          (cd artifact-output && zip -r "../persist-${TAG}-runtime-packages.zip" packages)
+          (cd artifact-output/api && zip -r "../../persist-${TAG}-api.zip" .)
+          (cd artifact-output/web-next && zip -r "../../persist-${TAG}-web-next.zip" .)
 
       - name: Extract release notes from CHANGELOG
         id: changelog
