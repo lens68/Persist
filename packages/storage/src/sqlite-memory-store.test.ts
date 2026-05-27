@@ -21,12 +21,16 @@ describe('SqliteMemoryStore', () => {
     const memory = new SqliteMemoryStore(db);
     const session = await sessions.createSession({ title: 't' });
 
-    const first = await memory.replaceActiveSummary(session.id, {
-      sessionId: session.id,
-      type: 'summary',
-      content: 'v1',
-      sourceMessageIds: [],
-    }, null);
+    const first = await memory.replaceActiveSummary(
+      session.id,
+      {
+        sessionId: session.id,
+        type: 'summary',
+        content: 'v1',
+        sourceMessageIds: [],
+      },
+      null,
+    );
 
     const second = await memory.replaceActiveSummary(
       session.id,

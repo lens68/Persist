@@ -1,7 +1,4 @@
-import type {
-  CreateMemoryInjectionSnapshotInput,
-  MemoryInjectionSnapshot,
-} from '@persist/shared';
+import type { CreateMemoryInjectionSnapshotInput, MemoryInjectionSnapshot } from '@persist/shared';
 
 export function createInjectionSnapshot(
   input: CreateMemoryInjectionSnapshotInput,

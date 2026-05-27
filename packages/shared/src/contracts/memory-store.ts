@@ -1,7 +1,4 @@
-import type {
-  CreateMemoryEntryInput,
-  MemoryEntry,
-} from '../types/memory.js';
+import type { CreateMemoryEntryInput, MemoryEntry } from '../types/memory.js';
 
 /**
  * Continuity artifact persistence port (FR-MEM-01, NFR-MEM-02).

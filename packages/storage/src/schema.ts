@@ -48,6 +48,8 @@ export const injectionSnapshots = sqliteTable('injection_snapshots', {
   triggerMessageId: text('trigger_message_id').notNull(),
   strategy: text('strategy', { enum: ['summary_plus_recent_k'] }).notNull(),
   injectedMemoryIds: text('injected_memory_ids_json', { mode: 'json' }).$type<string[]>().notNull(),
-  resolvedMessages: text('resolved_messages_json', { mode: 'json' }).$type<ChatMessage[]>().notNull(),
+  resolvedMessages: text('resolved_messages_json', { mode: 'json' })
+    .$type<ChatMessage[]>()
+    .notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });

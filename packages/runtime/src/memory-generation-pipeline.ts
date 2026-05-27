@@ -1,9 +1,4 @@
-import type {
-  MemoryGenerator,
-  MemoryStore,
-  RuntimeChunk,
-  SessionStore,
-} from '@persist/shared';
+import type { MemoryGenerator, MemoryStore, RuntimeChunk, SessionStore } from '@persist/shared';
 import {
   createSummaryMemoryEntryInput,
   planMemoryGeneration,

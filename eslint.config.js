@@ -36,13 +36,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: [
-                'fastify',
-                'next',
-                'ai',
-                '@persist/provider',
-                '@persist/storage',
-              ],
+              group: ['fastify', 'next', 'ai', '@persist/provider', '@persist/storage'],
               message: 'Core packages must remain framework- and provider-agnostic.',
             },
           ],

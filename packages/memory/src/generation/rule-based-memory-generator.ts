@@ -1,4 +1,8 @@
-import type { GeneratedMemorySummary, MemoryGenerationInput, MemoryGenerator } from '@persist/shared';
+import type {
+  GeneratedMemorySummary,
+  MemoryGenerationInput,
+  MemoryGenerator,
+} from '@persist/shared';
 import { truncateSummary } from './truncate-summary.js';
 
 /**

@@ -10,9 +10,7 @@ export class SqliteMemoryStore implements MemoryStore {
 
   async appendMemory(sessionId: string, input: CreateMemoryEntryInput): Promise<MemoryEntry> {
     if (input.type === 'summary') {
-      throw new Error(
-        'Summary MemoryEntry must be persisted via replaceActiveSummary (IC-MEM-03)',
-      );
+      throw new Error('Summary MemoryEntry must be persisted via replaceActiveSummary (IC-MEM-03)');
     }
     const id = input.id ?? crypto.randomUUID();
     const now = new Date();
