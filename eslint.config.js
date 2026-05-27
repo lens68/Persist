@@ -36,8 +36,40 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['fastify', 'next', 'ai', '@persist/provider'],
+              group: [
+                'fastify',
+                'next',
+                'ai',
+                '@persist/provider',
+                '@persist/storage',
+              ],
               message: 'Core packages must remain framework- and provider-agnostic.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/memory/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'fastify',
+                'next',
+                'ai',
+                '@persist/provider',
+                '@persist/runtime',
+                '@persist/storage',
+                'better-sqlite3',
+                'drizzle-orm',
+              ],
+              message:
+                'Memory package is pure orchestration/policy — no runtime, provider, or storage.',
             },
           ],
         },

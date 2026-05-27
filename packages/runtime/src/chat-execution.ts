@@ -1,29 +1,35 @@
-import type { ChatProvider } from '@persist/shared';
-import { toChatMessages } from '@persist/shared';
-import type { ProviderMetadata, RuntimeChunk } from '@persist/shared';
-import type { SessionStore } from '@persist/shared';
+import type {
+  ChatProvider,
+  InjectionSnapshotStore,
+  MemoryGenerator,
+  MemoryStore,
+  ProviderMetadata,
+  RuntimeChunk,
+  SessionStore,
+} from '@persist/shared';
+import { isObservabilityChunk } from '@persist/shared';
+import { performMemoryInjection, resolveActiveSummary } from '@persist/memory';
+import type { ChatExecutionInput } from './chat-execution-types.js';
+import { runMemoryGenerationPipeline } from './memory-generation-pipeline.js';
 
-export interface ChatExecutionInput {
-  sessionId: string;
-  userContent: string;
-  model?: string;
-  signal?: AbortSignal;
-}
+export type { ChatExecutionInput } from './chat-execution-types.js';
 
 export interface ChatExecutionDeps {
   provider: ChatProvider;
   store: SessionStore;
+  memoryStore: MemoryStore;
+  injectionSnapshotStore: InjectionSnapshotStore;
+  memoryGenerator: MemoryGenerator;
 }
 
 /**
- * Persistence-aware chat execution.
- * Yields RuntimeChunks (runtime events) while persisting lifecycle state.
+ * Persistence-aware chat execution with continuity injection + post-execution generation (§9).
  */
 export async function* executeChat(
   deps: ChatExecutionDeps,
   input: ChatExecutionInput,
 ): AsyncIterable<RuntimeChunk> {
-  const { provider, store } = deps;
+  const { provider, store, memoryStore, injectionSnapshotStore, memoryGenerator } = deps;
   const { sessionId, userContent, model, signal } = input;
 
   const session = await store.getSessionWithMessages(sessionId);
@@ -45,11 +51,12 @@ export async function* executeChat(
     return;
   }
 
-  await store.appendMessage(sessionId, {
+  const userMessage = await store.appendMessage(sessionId, {
     role: 'user',
     content: userContent,
     completionState: 'completed',
   });
+  const triggerMessageId = userMessage.id;
 
   const updated = await store.getSessionWithMessages(sessionId);
   if (!updated) {
@@ -63,16 +70,46 @@ export async function* executeChat(
     return;
   }
 
+  const memories = await memoryStore.listMemories(sessionId);
+  const activeSummary = resolveActiveSummary(memories);
+
+  const injection = performMemoryInjection({
+    sessionId,
+    triggerMessageId,
+    messages: updated.messages,
+    activeSummary,
+  });
+
+  const persistedSnapshot = await injectionSnapshotStore.appendInjectionSnapshot(sessionId, {
+    sessionId,
+    triggerMessageId: injection.snapshot.triggerMessageId,
+    injectedMemoryIds: injection.snapshot.injectedMemoryIds,
+    resolvedMessages: injection.resolvedMessages,
+    strategy: injection.snapshot.strategy,
+  });
+
+  yield {
+    type: 'memory-injected',
+    sessionId,
+    timestamp: new Date(),
+    snapshot: persistedSnapshot,
+  };
+
   let assistantMessageId: string | undefined;
   let accumulated = '';
   let providerMetadata: ProviderMetadata | undefined;
+  let executionCompleted = false;
 
   for await (const chunk of provider.chat({
     sessionId,
-    messages: toChatMessages(updated.messages),
+    messages: persistedSnapshot.resolvedMessages,
     model,
     signal,
   })) {
+    if (isObservabilityChunk(chunk)) {
+      continue;
+    }
+
     if (chunk.type === 'message-start') {
       assistantMessageId = chunk.messageId;
       await store.appendMessage(sessionId, {
@@ -121,6 +158,9 @@ export async function* executeChat(
           completedAt: new Date(),
         });
       }
+      if (chunk.completionState === 'completed') {
+        executionCompleted = true;
+      }
     }
 
     if (chunk.type === 'error' && assistantMessageId) {
@@ -132,5 +172,16 @@ export async function* executeChat(
     }
 
     yield chunk;
+  }
+
+  if (executionCompleted) {
+    for await (const genChunk of runMemoryGenerationPipeline({
+      sessionId,
+      store,
+      memoryStore,
+      memoryGenerator,
+    })) {
+      yield genChunk;
+    }
   }
 }

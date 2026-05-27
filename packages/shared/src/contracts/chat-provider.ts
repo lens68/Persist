@@ -1,11 +1,9 @@
 import type { Message } from '../types/message.js';
+import type { ChatMessage } from '../types/chat-message.js';
 import type { RuntimeChunk } from '../types/runtime-chunk.js';
 
-/** Minimal message shape for provider context (runtime → provider). */
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-}
+export type { ChatMessage } from '../types/chat-message.js';
+export { ChatMessageSchema } from '../types/chat-message.js';
 
 export interface ChatRequest {
   sessionId: string;

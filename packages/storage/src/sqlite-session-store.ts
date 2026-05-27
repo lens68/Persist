@@ -124,9 +124,42 @@ export class SqliteSessionStore implements SessionStore {
   async getReplay(sessionId: string): Promise<SessionReplay | null> {
     const swm = await this.getSessionWithMessages(sessionId);
     if (!swm) return null;
+
+    const memoryRows = await this.db
+      .select()
+      .from(schema.memoryEntries)
+      .where(eq(schema.memoryEntries.sessionId, sessionId))
+      .orderBy(asc(schema.memoryEntries.createdAt));
+
+    const snapshotRows = await this.db
+      .select()
+      .from(schema.injectionSnapshots)
+      .where(eq(schema.injectionSnapshots.sessionId, sessionId))
+      .orderBy(asc(schema.injectionSnapshots.createdAt));
+
+    const { messages, ...sessionOnly } = swm;
     return {
-      session: swm,
-      messages: swm.messages,
+      session: sessionOnly,
+      messages,
+      memories: memoryRows.map((row) => ({
+        id: row.id,
+        sessionId: row.sessionId,
+        type: row.type,
+        content: row.content,
+        sourceMessageIds: row.sourceMessageIds ?? undefined,
+        metadata: row.metadata ?? undefined,
+        supersededBy: row.supersededBy ?? undefined,
+        createdAt: row.createdAt,
+      })),
+      injectionSnapshots: snapshotRows.map((row) => ({
+        id: row.id,
+        sessionId: row.sessionId,
+        triggerMessageId: row.triggerMessageId,
+        injectedMemoryIds: row.injectedMemoryIds,
+        resolvedMessages: row.resolvedMessages,
+        strategy: row.strategy,
+        createdAt: row.createdAt,
+      })),
       reconstructedAt: new Date(),
     };
   }

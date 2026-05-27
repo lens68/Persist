@@ -47,7 +47,7 @@ describe('shared contracts', () => {
     expect(chunk.type).toBe('text-delta');
   });
 
-  it('validates replay payload', () => {
+  it('validates replay payload (v0.1-compatible defaults)', () => {
     const replay = SessionReplaySchema.parse({
       session: {
         id: '550e8400-e29b-41d4-a716-446655440000',
@@ -58,6 +58,8 @@ describe('shared contracts', () => {
       reconstructedAt: new Date(),
     });
     expect(replay.messages).toEqual([]);
+    expect(replay.memories).toEqual([]);
+    expect(replay.injectionSnapshots).toEqual([]);
   });
 
   it('validates create session input', () => {

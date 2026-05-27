@@ -83,8 +83,21 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/memory:
+    dependencies:
+      '@persist/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/provider:
     dependencies:
+      '@persist/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@persist/shared':
         specifier: workspace:*
         version: link:../shared
@@ -95,6 +108,9 @@ importers:
 
   packages/runtime:
     dependencies:
+      '@persist/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@persist/shared':
         specifier: workspace:*
         version: link:../shared

@@ -1,17 +1,25 @@
 import type { FastifyInstance } from 'fastify';
-import type { ChatProvider } from '@persist/shared';
-import type { SessionStore } from '@persist/shared';
+import type {
+  ChatProvider,
+  InjectionSnapshotStore,
+  MemoryGenerator,
+  MemoryStore,
+  SessionStore,
+} from '@persist/shared';
 import { CreateSessionInputSchema } from '@persist/shared';
 import { executeChat } from '@persist/runtime';
 import { writeRuntimeChunkSse } from './sse.js';
 
 export interface ApiDeps {
   store: SessionStore;
+  memoryStore: MemoryStore;
+  injectionSnapshotStore: InjectionSnapshotStore;
   provider: ChatProvider;
+  memoryGenerator: MemoryGenerator;
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
-  const { store, provider } = deps;
+  const { store, memoryStore, injectionSnapshotStore, provider, memoryGenerator } = deps;
 
   app.post('/api/sessions', async (request, reply) => {
     const body = CreateSessionInputSchema.safeParse(request.body ?? {});
@@ -32,6 +40,13 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     return replay;
   });
 
+  app.get<{ Params: { id: string } }>('/api/sessions/:id/memories', async (request, reply) => {
+    const session = await store.getSession(request.params.id);
+    if (!session) return reply.status(404).send({ error: 'Session not found' });
+    const memories = await memoryStore.listMemories(request.params.id);
+    return memories;
+  });
+
   app.post<{ Params: { id: string } }>('/api/sessions/:id/messages', async (request, reply) => {
     const sessionId = request.params.id;
     const body = request.body as { content?: string; model?: string };
@@ -41,7 +56,7 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     }
 
     const stream = executeChat(
-      { provider, store },
+      { provider, store, memoryStore, injectionSnapshotStore, memoryGenerator },
       { sessionId, userContent: content, model: body?.model },
     );
 

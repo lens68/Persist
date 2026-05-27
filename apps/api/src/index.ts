@@ -3,8 +3,13 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { QwenProvider } from '@persist/provider';
-import { createDatabase, SqliteSessionStore } from '@persist/storage';
+import { LlmSummaryMemoryGenerator, QwenProvider } from '@persist/provider';
+import {
+  createDatabase,
+  SqliteInjectionSnapshotStore,
+  SqliteMemoryStore,
+  SqliteSessionStore,
+} from '@persist/storage';
 import { registerRoutes } from './routes.js';
 
 // Load monorepo root .env when running from apps/api (pnpm dev).
@@ -21,15 +26,26 @@ async function main() {
 
   const db = createDatabase(databaseUrl);
   const store = new SqliteSessionStore(db);
+  const memoryStore = new SqliteMemoryStore(db);
+  const injectionSnapshotStore = new SqliteInjectionSnapshotStore(db);
   const provider = new QwenProvider({
     apiKey: apiKey ?? '',
     baseUrl: process.env.DASHSCOPE_BASE_URL,
     defaultModel: process.env.DASHSCOPE_MODEL,
   });
+  const memoryGenerator = new LlmSummaryMemoryGenerator(provider, {
+    model: process.env.DASHSCOPE_MODEL,
+  });
 
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: true });
-  await registerRoutes(app, { store, provider });
+  await registerRoutes(app, {
+    store,
+    memoryStore,
+    injectionSnapshotStore,
+    provider,
+    memoryGenerator,
+  });
 
   await app.listen({ port, host: '0.0.0.0' });
   console.log(`[persist/api] listening on http://localhost:${port}`);

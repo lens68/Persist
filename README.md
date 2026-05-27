@@ -1,6 +1,6 @@
 # Persist
 
-**Persistent Execution Runtime** — Stateful Chat Runtime（v0.1）。
+**Persistent Execution Runtime** — Memory-aware Execution Runtime（v0.2）。
 
 Chat 是当前第一种 execution form；长期演化为 tool / planning / agent execution。
 
@@ -9,8 +9,8 @@ Chat 是当前第一种 execution form；长期演化为 tool / planning / agent
 ## 技术栈
 
 - pnpm workspaces · Node 20 · TypeScript
-- `@persist/runtime` + `@persist/shared`（Core）
-- `@persist/provider` + `@persist/api`（Integration）
+- `@persist/shared` + `@persist/memory` + `@persist/runtime`（Core）
+- `@persist/provider` + `@persist/storage` + `@persist/api`（Integration）
 - SQLite + Drizzle · Fastify · Next.js（UI shell）
 
 ## 快速开始
@@ -44,7 +44,7 @@ pnpm test
 
 版本记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
-## API（v0.1）
+## API（v0.2）
 
 | Method | Path                                |
 | ------ | ----------------------------------- |
@@ -52,6 +52,7 @@ pnpm test
 | GET    | `/api/sessions/:id`                 |
 | POST   | `/api/sessions/:id/messages`（SSE） |
 | GET    | `/api/sessions/:id/replay`          |
+| GET    | `/api/sessions/:id/memories`        |
 
 ## 结构
 
@@ -59,6 +60,7 @@ pnpm test
 apps/api
 apps/web
 packages/shared
+packages/memory
 packages/runtime
 packages/provider
 packages/storage

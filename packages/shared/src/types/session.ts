@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MessageSchema } from './message.js';
+import { MemoryEntrySchema, MemoryInjectionSnapshotSchema } from './memory.js';
 
 export const SessionSchema = z.object({
   id: z.string().uuid(),
@@ -27,10 +28,12 @@ export const SessionWithMessagesSchema = SessionSchema.extend({
 
 export type SessionWithMessages = z.infer<typeof SessionWithMessagesSchema>;
 
-/** Replay payload — historical reconstruction only. */
+/** Replay payload — historical reconstruction only (FR-MEM-09). */
 export const SessionReplaySchema = z.object({
   session: SessionSchema,
   messages: z.array(MessageSchema),
+  memories: z.array(MemoryEntrySchema).default([]),
+  injectionSnapshots: z.array(MemoryInjectionSnapshotSchema).default([]),
   reconstructedAt: z.coerce.date(),
 });
 

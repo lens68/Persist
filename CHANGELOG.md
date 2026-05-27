@@ -2,6 +2,37 @@
 
 本文件记录 Persist 的版本变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.2.0] - 2026-05-27
+
+### 概述
+
+**Persist v0.2.0 — Memory-aware Execution Runtime**
+
+在 v0.1 Stateful Chat Runtime 上引入 **Summary-based Runtime Continuity Memory**：bounded-context injection、持久化 continuity artifact、post-execution summary generation、可审计 replay。
+
+### Added
+
+- **@persist/memory** — orchestration / policy（`resolveInjection`、`planMemoryGeneration` 等纯函数）
+- **Memory 契约** — `MemoryEntry`、`MemoryInjectionSnapshot`、`MemoryStore`、`InjectionSnapshotStore`、`MemoryGenerator`
+- **Observability RuntimeChunk** — `memory-injected`、`memory-generated`（不驱动 message lifecycle）
+- **Storage** — `memory_entries`、`injection_snapshots` 表；`SqliteMemoryStore`（`replaceActiveSummary` 原子 supersede）
+- **Generators** — `RuleBasedMemoryGenerator`、`LlmSummaryMemoryGenerator`（仅 `provider.chat`，不经 `executeChat`）
+- **executeChat** — injection → provider bounded context → `done(completed)` 后 generation pipeline
+- **API** — `GET /api/sessions/:id/memories`
+- **Web** — 只读 Runtime Continuity Memory 面板（inspect only）
+
+### Architecture
+
+- Memory = Runtime Continuity Artifact（非 RAG / 非 chat history UI state）
+- Provider-neutral：`ChatRequest` 未扩展；injection 在 runtime + memory 组装
+- Replay：返回 `memories` + `injectionSnapshots`（含 `resolvedMessages` 审计载荷）
+- Per-session only；无 cross-session / Vector / Agent Loop
+
+### 明确未包含
+
+- Tool Runtime（MCP）、Planning Runtime、Auth、Vector DB、Event Bus
+- `POST /summarize` 等绕过 runtime 的 memory 写 API
+
 ## [0.1.0] - 2026-05-27
 
 ### 概述

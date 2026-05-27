@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ProviderMetadataSchema, TokenUsageSchema } from './provider-metadata.js';
+import { MemoryEntrySchema, MemoryInjectionSnapshotSchema } from './memory.js';
 
 const BaseChunkSchema = z.object({
   sessionId: z.string().uuid(),
@@ -44,6 +45,32 @@ export const DoneChunkSchema = BaseChunkSchema.extend({
   providerMetadata: ProviderMetadataSchema.optional(),
 });
 
+/** Observability: runtime injected continuity before provider.chat (FR-MEM-11). */
+export const MemoryInjectedChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('memory-injected'),
+  snapshot: MemoryInjectionSnapshotSchema,
+});
+
+/** Observability: new summary persisted after generation (FR-MEM-12). */
+export const MemoryGeneratedChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('memory-generated'),
+  memory: MemoryEntrySchema,
+});
+
+export const ExecutionChunkSchema = z.discriminatedUnion('type', [
+  TextDeltaChunkSchema,
+  MessageStartChunkSchema,
+  MessageEndChunkSchema,
+  UsageChunkSchema,
+  ErrorChunkSchema,
+  DoneChunkSchema,
+]);
+
+export const ObservabilityChunkSchema = z.discriminatedUnion('type', [
+  MemoryInjectedChunkSchema,
+  MemoryGeneratedChunkSchema,
+]);
+
 export const RuntimeChunkSchema = z.discriminatedUnion('type', [
   TextDeltaChunkSchema,
   MessageStartChunkSchema,
@@ -51,6 +78,8 @@ export const RuntimeChunkSchema = z.discriminatedUnion('type', [
   UsageChunkSchema,
   ErrorChunkSchema,
   DoneChunkSchema,
+  MemoryInjectedChunkSchema,
+  MemoryGeneratedChunkSchema,
 ]);
 
 export type RuntimeChunk = z.infer<typeof RuntimeChunkSchema>;
@@ -60,3 +89,18 @@ export type MessageEndChunk = z.infer<typeof MessageEndChunkSchema>;
 export type UsageChunk = z.infer<typeof UsageChunkSchema>;
 export type ErrorChunk = z.infer<typeof ErrorChunkSchema>;
 export type DoneChunk = z.infer<typeof DoneChunkSchema>;
+export type MemoryInjectedChunk = z.infer<typeof MemoryInjectedChunkSchema>;
+export type MemoryGeneratedChunk = z.infer<typeof MemoryGeneratedChunkSchema>;
+export type ExecutionChunk = z.infer<typeof ExecutionChunkSchema>;
+export type ObservabilityChunk = z.infer<typeof ObservabilityChunkSchema>;
+
+export const OBSERVABILITY_CHUNK_TYPES = ['memory-injected', 'memory-generated'] as const;
+export type ObservabilityChunkType = (typeof OBSERVABILITY_CHUNK_TYPES)[number];
+
+export function isObservabilityChunk(chunk: RuntimeChunk): chunk is ObservabilityChunk {
+  return (OBSERVABILITY_CHUNK_TYPES as readonly string[]).includes(chunk.type);
+}
+
+export function isExecutionChunk(chunk: RuntimeChunk): chunk is ExecutionChunk {
+  return !isObservabilityChunk(chunk);
+}
