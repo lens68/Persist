@@ -12,6 +12,7 @@ coverage/
 *.log
 .data/
 *.tsbuildinfo
+.ci-artifacts/
 
 # artifact-output/ is intentionally NOT gitignored — upload-artifact v4 reads .gitignore
 AGENTS.md
