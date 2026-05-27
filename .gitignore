@@ -11,6 +11,7 @@ dist/
 coverage/
 *.log
 .data/
+*.tsbuildinfo
 
 # Local governance docs (not published to GitHub)
 AGENTS.md
