@@ -1,0 +1,69 @@
+import { describe, expect, it } from 'vitest';
+import { QwenProvider } from './qwen-provider.js';
+
+function sseResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const c of chunks) {
+        controller.enqueue(encoder.encode(c));
+      }
+      controller.close();
+    },
+  });
+  return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+describe('QwenProvider', () => {
+  it('normalizes OpenAI-compatible SSE to RuntimeChunks', async () => {
+    const provider = new QwenProvider({
+      apiKey: 'test-key',
+      fetchImpl: async () =>
+        sseResponse([
+          'data: {"id":"req-1","choices":[{"delta":{"content":"Hel"},"index":0}]}\n\n',
+          'data: {"choices":[{"delta":{"content":"lo"},"index":0}]}\n\n',
+          'data: {"choices":[{"delta":{},"finish_reason":"stop","index":0}],"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3}}\n\n',
+          'data: [DONE]\n\n',
+        ]),
+    });
+
+    const chunks = [];
+    for await (const chunk of provider.chat({
+      sessionId: '550e8400-e29b-41d4-a716-446655440000',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.some((c) => c.type === 'message-start')).toBe(true);
+    expect(chunks.filter((c) => c.type === 'text-delta').map((c) => c.delta).join('')).toBe(
+      'Hello',
+    );
+    expect(chunks.some((c) => c.type === 'usage')).toBe(true);
+    expect(chunks.some((c) => c.type === 'message-end')).toBe(true);
+    const done = chunks.find((c) => c.type === 'done');
+    expect(done?.type).toBe('done');
+    if (done?.type === 'done') {
+      expect(done.providerMetadata?.model).toBeDefined();
+      expect(done.completionState).toBe('completed');
+    }
+  });
+
+  it('yields error chunk on HTTP failure', async () => {
+    const provider = new QwenProvider({
+      apiKey: 'test-key',
+      fetchImpl: async () => new Response('bad', { status: 401 }),
+    });
+
+    const chunks = [];
+    for await (const chunk of provider.chat({
+      sessionId: '550e8400-e29b-41d4-a716-446655440000',
+      messages: [{ role: 'user', content: 'Hi' }],
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks.some((c) => c.type === 'error')).toBe(true);
+    expect(chunks.find((c) => c.type === 'done')?.completionState).toBe('failed');
+  });
+});

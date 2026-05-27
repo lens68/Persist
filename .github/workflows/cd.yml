@@ -1,0 +1,66 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  release-artifacts:
+    name: Build & Publish Artifacts
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production bundles
+        run: pnpm run build
+        env:
+          DASHSCOPE_API_KEY: cd-placeholder-not-a-real-key
+
+      - name: Upload API build
+        uses: actions/upload-artifact@v4
+        with:
+          name: persist-api-dist
+          path: apps/api/dist/
+          if-no-files-found: error
+
+      - name: Upload workspace packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: persist-packages-dist
+          path: |
+            packages/shared/dist/
+            packages/runtime/dist/
+            packages/provider/dist/
+            packages/storage/dist/
+          if-no-files-found: error
+
+      - name: Upload Next.js build
+        uses: actions/upload-artifact@v4
+        with:
+          name: persist-web-next
+          path: apps/web/.next/
+          if-no-files-found: error

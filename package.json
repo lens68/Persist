@@ -1,0 +1,31 @@
+{
+  "name": "persist",
+  "type": "module",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Persistent Runtime — Stateful Agent Runtime substrate",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm --filter @persist/api dev",
+    "dev:web": "pnpm --filter @persist/web dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^2.1.8"
+  }
+}

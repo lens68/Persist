@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+.turbo/
+*.db
+*.db-journal
+.env
+.env.*
+.env.example
+.DS_Store
+coverage/
+*.log
+.data/
+
+# Local governance docs (not published to GitHub)
+AGENTS.md
+docs/
