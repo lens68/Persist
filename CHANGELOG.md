@@ -40,7 +40,11 @@
 - **CI/CD**
   - CI：Prettier → ESLint → typecheck → test → build
   - CD：main 分支构建产物（Actions Artifacts）
-  - Release：tag `v*.*.*` 触发 GitHub Release 与构建包
+  - Release：tag `v*.*.*` 触发 GitHub Release（runtime / api / web 构建包）
+
+### Fixed
+
+- CD/Release：`upload-artifact@v4` 默认遵循 `.gitignore`，导致 `dist/`、`.next/` 无法上传；改为 staging 至 `.ci-artifacts/` 后再发布
 
 ### Architecture
 

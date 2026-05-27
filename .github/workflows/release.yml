@@ -66,19 +66,14 @@ jobs:
         env:
           DASHSCOPE_API_KEY: ci-placeholder-not-a-real-key
 
-      - name: Package release artifacts
+      - name: Stage and package release artifacts
         run: |
           TAG="${{ steps.version.outputs.tag }}"
-          mkdir -p release-bundle/api release-bundle/packages
+          bash .github/scripts/stage-artifacts.sh .ci-artifacts
 
-          cp -r apps/api/dist/. release-bundle/api/
-          cp -r packages/shared/dist release-bundle/packages/shared
-          cp -r packages/runtime/dist release-bundle/packages/runtime
-          cp -r packages/provider/dist release-bundle/packages/provider
-          cp -r packages/storage/dist release-bundle/packages/storage
-
-          (cd release-bundle && zip -r "../persist-${TAG}-runtime-packages.zip" packages)
-          (cd release-bundle/api && zip -r "../../persist-${TAG}-api.zip" .)
+          (cd .ci-artifacts && zip -r "../persist-${TAG}-runtime-packages.zip" packages)
+          (cd .ci-artifacts/api && zip -r "../../persist-${TAG}-api.zip" .)
+          (cd .ci-artifacts/web && zip -r "../../persist-${TAG}-web-next.zip" .next)
 
       - name: Extract release notes from CHANGELOG
         id: changelog
@@ -113,4 +108,5 @@ jobs:
           files: |
             persist-${{ steps.version.outputs.tag }}-runtime-packages.zip
             persist-${{ steps.version.outputs.tag }}-api.zip
+            persist-${{ steps.version.outputs.tag }}-web-next.zip
           fail_on_unmatched_files: true

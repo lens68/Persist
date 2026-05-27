@@ -5,7 +5,8 @@
   "version": "0.1.0",
   "description": "Persistent Runtime — Stateful Agent Runtime substrate",
   "scripts": {
-    "build": "pnpm -r --sort run build",
+    "build": "pnpm run build:packages && pnpm run build:apps",
+    "build:apps": "pnpm --filter @persist/api --filter @persist/web run build",
     "build:packages": "pnpm --filter \"./packages/**\" -r --sort run build",
     "dev": "pnpm --filter @persist/api dev",
     "dev:web": "pnpm --filter @persist/web dev",

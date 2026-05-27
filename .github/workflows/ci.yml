@@ -50,7 +50,7 @@ jobs:
           DASHSCOPE_API_KEY: ci-placeholder-not-a-real-key
 
       - name: Build apps (packages built during typecheck)
-        run: pnpm --filter @persist/api --filter @persist/web run build
+        run: pnpm run build:apps
 
   # Gate: downstream CD only runs when quality job succeeds on main.
   ci-success:
