@@ -43,12 +43,12 @@ pnpm test
 
 ## API（v0.1）
 
-| Method | Path |
-|--------|------|
-| POST | `/api/sessions` |
-| GET | `/api/sessions/:id` |
-| POST | `/api/sessions/:id/messages`（SSE） |
-| GET | `/api/sessions/:id/replay` |
+| Method | Path                                |
+| ------ | ----------------------------------- |
+| POST   | `/api/sessions`                     |
+| GET    | `/api/sessions/:id`                 |
+| POST   | `/api/sessions/:id/messages`（SSE） |
+| GET    | `/api/sessions/:id/replay`          |
 
 ## 结构
 

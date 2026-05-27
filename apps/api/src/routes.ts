@@ -32,23 +32,20 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     return replay;
   });
 
-  app.post<{ Params: { id: string } }>(
-    '/api/sessions/:id/messages',
-    async (request, reply) => {
-      const sessionId = request.params.id;
-      const body = request.body as { content?: string; model?: string };
-      const content = body?.content?.trim();
-      if (!content) {
-        return reply.status(400).send({ error: 'content is required' });
-      }
+  app.post<{ Params: { id: string } }>('/api/sessions/:id/messages', async (request, reply) => {
+    const sessionId = request.params.id;
+    const body = request.body as { content?: string; model?: string };
+    const content = body?.content?.trim();
+    if (!content) {
+      return reply.status(400).send({ error: 'content is required' });
+    }
 
-      const stream = executeChat(
-        { provider, store },
-        { sessionId, userContent: content, model: body?.model },
-      );
+    const stream = executeChat(
+      { provider, store },
+      { sessionId, userContent: content, model: body?.model },
+    );
 
-      reply.hijack();
-      await writeRuntimeChunkSse(reply.raw, stream);
-    },
-  );
+    reply.hijack();
+    await writeRuntimeChunkSse(reply.raw, stream);
+  });
 }

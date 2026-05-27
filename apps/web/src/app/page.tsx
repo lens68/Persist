@@ -16,7 +16,11 @@ export default function HomePage() {
 
   const ensureSession = useCallback(async () => {
     if (sessionId) return sessionId;
-    const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const res = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
     const session = await res.json();
     setSessionId(session.id);
     return session.id as string;
@@ -119,9 +123,7 @@ export default function HomePage() {
         </button>
       </div>
       {sessionId && (
-        <p style={{ fontSize: 12, color: '#999', marginTop: 16 }}>
-          Session: {sessionId}
-        </p>
+        <p style={{ fontSize: 12, color: '#999', marginTop: 16 }}>Session: {sessionId}</p>
       )}
     </main>
   );

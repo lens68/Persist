@@ -19,7 +19,9 @@ export interface SessionStore {
   updateMessage(
     sessionId: string,
     messageId: string,
-    patch: Partial<Pick<Message, 'content' | 'providerMetadata' | 'completionState' | 'completedAt'>>,
+    patch: Partial<
+      Pick<Message, 'content' | 'providerMetadata' | 'completionState' | 'completedAt'>
+    >,
   ): Promise<Message>;
 
   getReplay(sessionId: string): Promise<SessionReplay | null>;

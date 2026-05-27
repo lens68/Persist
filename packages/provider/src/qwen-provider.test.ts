@@ -36,9 +36,12 @@ describe('QwenProvider', () => {
     }
 
     expect(chunks.some((c) => c.type === 'message-start')).toBe(true);
-    expect(chunks.filter((c) => c.type === 'text-delta').map((c) => c.delta).join('')).toBe(
-      'Hello',
-    );
+    expect(
+      chunks
+        .filter((c) => c.type === 'text-delta')
+        .map((c) => c.delta)
+        .join(''),
+    ).toBe('Hello');
     expect(chunks.some((c) => c.type === 'usage')).toBe(true);
     expect(chunks.some((c) => c.type === 'message-end')).toBe(true);
     const done = chunks.find((c) => c.type === 'done');

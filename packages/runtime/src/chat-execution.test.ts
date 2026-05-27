@@ -59,7 +59,9 @@ class MemoryStore implements SessionStore {
   async updateMessage(
     sessionId: string,
     messageId: string,
-    patch: Partial<Pick<Message, 'content' | 'providerMetadata' | 'completionState' | 'completedAt'>>,
+    patch: Partial<
+      Pick<Message, 'content' | 'providerMetadata' | 'completionState' | 'completedAt'>
+    >,
   ): Promise<Message> {
     const s = this.sessions.get(sessionId)!;
     const idx = s.messages.findIndex((m) => m.id === messageId);

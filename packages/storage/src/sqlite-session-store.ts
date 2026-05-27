@@ -107,10 +107,7 @@ export class SqliteSessionStore implements SessionStore {
     if (patch.providerMetadata !== undefined) updates.providerMetadata = patch.providerMetadata;
     if (patch.completedAt !== undefined) updates.completedAt = patch.completedAt;
 
-    await this.db
-      .update(schema.messages)
-      .set(updates)
-      .where(eq(schema.messages.id, messageId));
+    await this.db.update(schema.messages).set(updates).where(eq(schema.messages.id, messageId));
 
     await this.db
       .update(schema.sessions)
