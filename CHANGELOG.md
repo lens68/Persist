@@ -8,29 +8,103 @@
 
 **Persist v0.3.0 — Tool-Augmented Execution Runtime**
 
-在 v0.2 Memory-aware Runtime 上引入 **Single Tool Call Runtime**：Provider Function Calling + Runtime-controlled `ToolExecutor` + `ToolExecutionSnapshot` 可审计 Replay。
+在 v0.2 Memory-aware Runtime 上引入 **Single Tool Call Runtime**：Provider Function Calling + Runtime 控制的 `ToolExecutor` + `ToolExecutionSnapshot` 可审计 Replay；Sales Demo（`query_sales` → 只读 SQLite fixture）验证「LLM 不直连数据库」。
+
+> Persist is fundamentally an execution runtime with persistence and replayability.
 
 ### Added
 
-- **`@persist/tool`** — 纯 policy（单 call 限制、多 call 截断、payload 截断、`query_sales` SQL 模板）
-- **`@persist/mcp-tool-adapter`** — MCP → `ToolDefinition` / `McpToolExecutor`（integration）
-- **Tool 契约** — `ToolDefinition`、`ToolExecutor`、`ToolExecutionSnapshot`、扩展 `ChatMessage` / `RuntimeChunk`
-- **`executeChat` §9 双路径** — 无 tool_call 单次 provider；有 tool_call 时 Tool 执行 + 第二次 memory injection + provider #2
-- **`SqliteInProcessToolExecutor`** + 独立只读 `sales-fixture.db`（Sales Demo）
-- **Replay** — `SessionReplay.toolExecutionSnapshots`
-- **Qwen Function Calling** — 流式 `tool-call-*` + `done.providerMetadata.toolCalls`
+- **Monorepo 扩展**（pnpm workspaces）
+  - `@persist/tool` — 纯 policy（单 call 限制、多 call 截断、payload 截断、`query_sales` SQL 白名单模板；**无 I/O**）
+  - `@persist/mcp-tool-adapter` — MCP → `ToolDefinition` / `McpToolExecutor`（integration，包级实现 + 测试）
+  - `@persist/runtime` — `executeChat` §9 双路径（`provider-chat-phase` / `tool-execution-phase`）
+  - `@persist/storage` — `SqliteInProcessToolExecutor`、`SqliteToolExecutionSnapshotStore`、`sales-fixture.db`
+  - `@persist/provider` — Qwen Function Calling（`tools` / `tool-call-*` / `providerMetadata.toolCalls`）
+  - `@persist/api` — DI：`ToolExecutor` + `QUERY_SALES_TOOL_DEFINITION`；Replay 返回 `toolExecutionSnapshots`
+  - `@persist/web` — Tool 场景 SSE 过滤 + 流结束后从 Session 同步最终 assistant 文本
+
+- **Tool 契约**（`@persist/shared`）
+  - `ToolDefinition`、`ToolExecutor`、`ToolExecutionSnapshot`、`CreateToolExecutionSnapshotInput`
+  - 扩展 `ChatMessage`（`tool` role、`toolCallId` / `toolName`）、`RuntimeChunk`（`tool-call-*` / `tool-result` / `tool-payload-truncated`）
+  - 扩展 `SessionReplay.toolExecutionSnapshots`、`ProviderMetadata.toolCalls`
+
+- **Single Tool Call Runtime（v0.3 核心）**
+  - 无 `tool_call`：Memory injection → Provider #1 →（可选）Memory generation
+  - 有 `tool_call`：Provider #1 → **单次** `ToolExecutor.call()` → Memory injection #2 → Provider #2 →（可选）Memory generation
+  - `query_sales`：参数 `metric` / `period` → 模板 SQL → 只读 `sales-fixture.db`（IC-TOOL-07，禁止 LLM 自由拼 SQL）
+  - Tool 失败仍走 Provider #2 + generation（IC-TOOL-10）；Replay **不**重新执行 Tool / LLM（NFR-TOOL-04）
+
+- **RuntimeChunk 事件流**（在 v0.2 基础上扩展）
+  - Tool execution：`tool-call-start` / `tool-call-end` / `tool-result`
+  - Tool policy observability：`tool-call-truncated` / `tool-payload-truncated`
+  - v0.2 Memory observability 不变：`memory-injected` / `memory-generated`
+
+- **REST API（v0.3）**
+  - `POST /api/sessions/:id/messages` — 注册 tools 后流式 Chat（SSE）
+  - `GET /api/sessions/:id/replay` — 含 `toolExecutionSnapshots`（与 messages / memories / injectionSnapshots 一并重建）
+
+- **持久化模型**
+  - `tool_execution_snapshots`：`toolInput` / `toolOutput` / `status` / `payloadTruncated`
+  - Message 列：`tool_call_id`、`tool_name`（tool 角色消息）
+
+- **演示脚本**（`scripts/`，非构建产物）
+  - `run-tool-demo.mjs` — Sales / `query_sales` 端到端脚本验证
+  - `run-memory-demo.mjs` — v0.2 Memory 演示
+
+- **测试** — Vitest（66 tests，1 skipped）：shared tool contracts、tool policy、runtime 双路径 / IC-TOOL-10、storage snapshot + fixture、provider FC、mcp adapter
+
+- **CI/CD**
+  - CI：Prettier → ESLint → typecheck → test → build
+  - CD：main 分支构建产物（Actions Artifacts）
+  - Release：tag `v*.*.*` 触发 GitHub Release（runtime / api / web 构建包）
+
+### Fixed
+
+- Qwen FC：流结束后发出完整 `tool-call-start` / `tool-call-end`；解析 `message.tool_calls`；DashScope 无 tool body 时 Sales demo 安全回退
+- Tool 失败快照：`toolOutput` 持久化与 Web Provider #2 气泡同步
+- Release 打包：`stage-artifacts.sh` 避免 `find | head` SIGPIPE 导致 CI 失败
 
 ### Architecture
 
-- `packages/tool` 无 I/O（NFR-TOOL-03）；InProcess Executor 落 `packages/storage`
-- `runtime` 禁止 import `mcp-tool-adapter`
-- v0.2 Memory 语义不变（除 bugfix）
+- Core（`shared` / `memory` / `runtime` / `tool`）与 Integration（`provider` / `storage` / `mcp-tool-adapter` / `api` / `web`）分层
+- `packages/tool` **无** SQLite / Drizzle / HTTP（NFR-TOOL-03）；InProcess Executor 在 `packages/storage`
+- `runtime` 仅依赖 `ToolExecutor` 端口，**禁止** import `mcp-tool-adapter`
+- `provider` 不依赖 `runtime`；Qwen 仅做 Vendor Protocol Adaptation
+- v0.2 Memory 语义不变（injection / generation / replay 扩展，非替换）
+- **Per-turn 单次** `ToolExecutor.call()`；多 call 由 policy 截断为 1（IC-TOOL-06）
+- Persistence-first：tool snapshot、tool 消息、provider metadata 均进入 `executeChat` 生命周期
 
 ### 已知限制 / 集成说明
 
-- **默认 API DI**：`SqliteInProcessToolExecutor` + `query_sales` Sales fixture（`SALES_FIXTURE_DATABASE_URL`）
-- **`McpToolExecutor`**：已在 `@persist/mcp-tool-adapter` 实现并通过测试；生产 API 未默认接线，可通过替换 `ToolExecutor` DI 启用
-- **Web**：SSE 忽略 tool observability / execution chunks；Tool Timeline 未实现（DoD 可选）
+- **默认 API DI**：`SqliteInProcessToolExecutor` + `query_sales`（`SALES_FIXTURE_DATABASE_URL`，默认 `file:./.data/sales-fixture.db`）
+- **`McpToolExecutor`**：已在 `@persist/mcp-tool-adapter` 实现并通过测试；生产 API **未**默认接线，可替换 `ToolExecutor` DI 启用 MCP
+- **Web**：SSE 忽略 tool observability / execution chunks；仅展示最终 assistant 文本；Tool Timeline 未实现（DoD 可选）
+
+### 明确未包含（后续 Phase）
+
+- API 默认 DI `McpToolExecutor` / MCP Server 运维文档
+- Web Tool Timeline（可选 DoD）
+- Cross-session / User Profile Memory
+- Planning Runtime
+- Auth / 多用户 / Vector DB / RAG / **Autonomous Agent Loop** / Event Bus
+
+### 快速开始
+
+```bash
+pnpm install
+# 在项目根目录创建 .env（勿提交），配置 DASHSCOPE_API_KEY、DATABASE_URL、SALES_FIXTURE_DATABASE_URL 等
+pnpm -r run build
+pnpm dev          # API :3001
+pnpm dev:web      # Web :3000
+```
+
+**Sales Demo（实验 7）**：在 Web 或 `node scripts/run-tool-demo.mjs` 中提问，例如「上个月按 revenue 销量第一的产品」；预期 **Widget A** / revenue **12000**。审计：`GET /api/sessions/:id/replay` 查看 `toolExecutionSnapshots`。
+
+v0.2 Memory 面板行为不变：同 Session 约 **8 条消息** 后出现 Active summary。
+
+### 贡献者
+
+- lens68
 
 ## [0.2.0] - 2026-05-27
 
