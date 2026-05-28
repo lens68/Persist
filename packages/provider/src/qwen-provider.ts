@@ -62,7 +62,8 @@ export class QwenProvider implements ChatProvider {
           parameters: t.inputSchema,
         },
       }));
-      body.tool_choice = 'auto';
+      // Single-tool sessions (Sales demo): require FC so provider #2 can answer.
+      body.tool_choice = request.tools.length === 1 ? 'required' : 'auto';
     }
 
     const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
@@ -115,7 +116,6 @@ export class QwenProvider implements ChatProvider {
     let finishReason: string | undefined;
     let requestId: string | undefined;
     const toolCallAccum = new Map<number, AccumulatedToolCall>();
-    const emittedToolStarts = new Set<string>();
 
     for await (const event of parseOpenAiSseStream(response.body)) {
       const id = typeof event.id === 'string' ? event.id : undefined;
@@ -139,19 +139,6 @@ export class QwenProvider implements ChatProvider {
       const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
       if (deltaToolCalls && deltaToolCalls.length > 0) {
         mergeToolCallDelta(toolCallAccum, deltaToolCalls);
-        for (const tc of toolCallAccum.values()) {
-          if (tc.id && tc.name && !emittedToolStarts.has(tc.id)) {
-            emittedToolStarts.add(tc.id);
-            yield {
-              type: 'tool-call-start',
-              sessionId: request.sessionId,
-              timestamp: new Date(),
-              toolCallId: tc.id,
-              toolName: tc.name,
-              arguments: tc.arguments,
-            };
-          }
-        }
       }
 
       const fr = choice?.finish_reason;
@@ -180,6 +167,14 @@ export class QwenProvider implements ChatProvider {
       .map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments }));
 
     for (const tc of toolCalls) {
+      yield {
+        type: 'tool-call-start',
+        sessionId: request.sessionId,
+        timestamp: new Date(),
+        toolCallId: tc.id,
+        toolName: tc.name,
+        arguments: tc.arguments,
+      };
       yield {
         type: 'tool-call-end',
         sessionId: request.sessionId,

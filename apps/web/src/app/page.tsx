@@ -27,6 +27,19 @@ export default function HomePage() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const assistantRef = useRef('');
+  const streamingMessageIdRef = useRef<string | null>(null);
+
+  const syncMessagesFromServer = useCallback(async (sid: string) => {
+    const res = await fetch(`/api/sessions/${sid}`);
+    if (!res.ok) return;
+    const data = (await res.json()) as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    const visible = data.messages.filter(
+      (m) => m.role === 'user' || (m.role === 'assistant' && m.content?.trim()),
+    );
+    setMessages(visible.map((m) => ({ role: m.role, content: m.content })));
+  }, []);
 
   const loadMemories = useCallback(async (sid: string) => {
     setMemoriesLoading(true);
@@ -62,6 +75,7 @@ export default function HomePage() {
     setInput('');
     setStreaming(true);
     assistantRef.current = '';
+    streamingMessageIdRef.current = null;
 
     const sid = await ensureSession();
     setMessages((m) => [...m, { role: 'user', content: text }, { role: 'assistant', content: '' }]);
@@ -93,9 +107,37 @@ export default function HomePage() {
         const data = line.slice(5).trim();
         if (data === '[DONE]') continue;
         try {
-          const chunk = JSON.parse(data) as { type: string; delta?: string; content?: string };
+          const chunk = JSON.parse(data) as {
+            type: string;
+            delta?: string;
+            content?: string;
+            messageId?: string;
+            message?: string;
+          };
           if (IGNORED_SSE_TYPES.has(chunk.type)) {
             continue;
+          }
+          if (chunk.type === 'message-start' && chunk.messageId) {
+            const mid = chunk.messageId;
+            if (
+              streamingMessageIdRef.current &&
+              streamingMessageIdRef.current !== mid
+            ) {
+              assistantRef.current = '';
+              setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+            }
+            streamingMessageIdRef.current = mid;
+          }
+          if (chunk.type === 'error') {
+            assistantRef.current = `[错误] ${chunk.message ?? 'unknown'}`;
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (last?.role === 'assistant') {
+                next[next.length - 1] = { role: 'assistant', content: assistantRef.current };
+              }
+              return next;
+            });
           }
           if (chunk.type === 'text-delta' && chunk.delta) {
             assistantRef.current += chunk.delta;
@@ -126,6 +168,7 @@ export default function HomePage() {
     }
 
     setStreaming(false);
+    await syncMessagesFromServer(sid);
     await loadMemories(sid);
   };
 

@@ -25,7 +25,7 @@ export class SqliteToolExecutionSnapshotStore implements ToolExecutionSnapshotSt
       triggerMessageId: input.triggerMessageId,
       toolName: input.toolName,
       toolInputJson: input.toolInput,
-      toolOutputJson: input.toolOutput,
+      toolOutputJson: input.toolOutput ?? {},
       startedAt: input.startedAt,
       completedAt: input.completedAt,
       status: input.status,

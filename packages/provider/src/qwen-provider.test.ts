@@ -101,7 +101,7 @@ describe('QwenProvider', () => {
     }
 
     expect(requestBody?.tools).toBeDefined();
-    expect(requestBody?.tool_choice).toBe('auto');
+    expect(requestBody?.tool_choice).toBe('required');
     expect(chunks.some((c) => c.type === 'tool-call-start')).toBe(true);
     expect(chunks.some((c) => c.type === 'tool-call-end')).toBe(true);
     const done = chunks.find((c) => c.type === 'done');

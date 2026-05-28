@@ -32,6 +32,18 @@ export async function* runProviderChatPhase(
   let executionCompleted = false;
   const streamedToolCalls: ToolCallMetadata[] = [];
 
+  const upsertStreamedToolCall = (entry: ToolCallMetadata) => {
+    const idx = streamedToolCalls.findIndex((tc) => tc.id === entry.id);
+    if (idx >= 0) {
+      const prev = streamedToolCalls[idx]!;
+      const args =
+        entry.arguments.length >= prev.arguments.length ? entry.arguments : prev.arguments;
+      streamedToolCalls[idx] = { ...entry, arguments: args };
+    } else {
+      streamedToolCalls.push(entry);
+    }
+  };
+
   for await (const chunk of provider.chat({
     sessionId,
     messages,
@@ -44,13 +56,11 @@ export async function* runProviderChatPhase(
     }
 
     if (chunk.type === 'tool-call-start' || chunk.type === 'tool-call-end') {
-      if (chunk.type === 'tool-call-start') {
-        streamedToolCalls.push({
-          id: chunk.toolCallId,
-          name: chunk.toolName,
-          arguments: chunk.arguments,
-        });
-      }
+      upsertStreamedToolCall({
+        id: chunk.toolCallId,
+        name: chunk.toolName,
+        arguments: chunk.arguments,
+      });
       yield chunk;
       continue;
     }
@@ -94,6 +104,11 @@ export async function* runProviderChatPhase(
     if (chunk.type === 'done') {
       if (chunk.providerMetadata) {
         providerMetadata = { ...providerMetadata, ...chunk.providerMetadata };
+        if (chunk.providerMetadata.toolCalls?.length) {
+          for (const tc of chunk.providerMetadata.toolCalls) {
+            upsertStreamedToolCall(tc);
+          }
+        }
       }
       if (assistantMessageId) {
         await store.updateMessage(sessionId, assistantMessageId, {

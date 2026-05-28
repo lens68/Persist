@@ -153,7 +153,10 @@ export async function* executeToolCallPhase(
   );
   const completedAt = new Date();
 
-  const outputTrunc = truncatePayload(result.output);
+  const snapshotOutput = result.success
+    ? result.output
+    : (result.error ?? { message: 'Tool failed' });
+  const outputTrunc = truncatePayload(snapshotOutput);
   if (outputTrunc.truncated) {
     yield {
       type: 'tool-payload-truncated',

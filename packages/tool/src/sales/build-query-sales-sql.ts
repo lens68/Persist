@@ -12,10 +12,17 @@ export interface QuerySalesInput {
 }
 
 export function validateQuerySalesInput(input: unknown): QuerySalesInput {
+  if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed) throw new Error('query_sales input must be an object');
+    input = JSON.parse(trimmed) as unknown;
+  }
   if (!input || typeof input !== 'object') {
     throw new Error('query_sales input must be an object');
   }
-  const { metric, period } = input as Record<string, unknown>;
+  const raw = input as Record<string, unknown>;
+  const metric = raw.metric ?? raw.top_metric;
+  const period = raw.period ?? raw.time_range ?? raw.timeRange;
   if (typeof metric !== 'string' || !ALLOWED_METRICS.includes(metric as SalesMetric)) {
     throw new Error(`Invalid metric; allowed: ${ALLOWED_METRICS.join(', ')}`);
   }
