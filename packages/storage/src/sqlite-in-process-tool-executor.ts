@@ -1,8 +1,4 @@
-import type {
-  ToolExecutionContext,
-  ToolExecutor,
-  ToolResult,
-} from '@persist/shared';
+import type { ToolExecutionContext, ToolExecutor, ToolResult } from '@persist/shared';
 import {
   buildQuerySalesSql,
   validateQuerySalesInput,
@@ -26,7 +22,11 @@ export class SqliteInProcessToolExecutor implements ToolExecutor {
     this.fixtureDatabaseUrl = config.fixtureDatabaseUrl;
   }
 
-  async call(toolName: string, input: unknown, _context: ToolExecutionContext): Promise<ToolResult> {
+  async call(
+    toolName: string,
+    input: unknown,
+    _context: ToolExecutionContext,
+  ): Promise<ToolResult> {
     if (toolName !== 'query_sales') {
       return {
         success: false,
@@ -40,9 +40,7 @@ export class SqliteInProcessToolExecutor implements ToolExecutor {
       const sql = buildQuerySalesSql(metric as SalesMetric, period as SalesPeriod);
       const db = openSalesFixtureReadOnly(this.fixtureDatabaseUrl);
       try {
-        const row = db.prepare(sql).get() as
-          | { product_name: string; value: number }
-          | undefined;
+        const row = db.prepare(sql).get() as { product_name: string; value: number } | undefined;
         if (!row) {
           return { success: true, output: { product: null, metric, period } };
         }

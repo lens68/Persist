@@ -105,7 +105,9 @@ describe('QwenProvider', () => {
     expect(chunks.some((c) => c.type === 'tool-call-start')).toBe(true);
     expect(chunks.some((c) => c.type === 'tool-call-end')).toBe(true);
     const done = chunks.find((c) => c.type === 'done');
-    expect(done?.type === 'done' && done.providerMetadata?.toolCalls?.[0]?.name).toBe('query_sales');
+    expect(done?.type === 'done' && done.providerMetadata?.toolCalls?.[0]?.name).toBe(
+      'query_sales',
+    );
   });
 
   it.skipIf(!process.env.DASHSCOPE_API_KEY)('real Qwen FC integration (NFR-TOOL-09)', async () => {
@@ -117,7 +119,9 @@ describe('QwenProvider', () => {
     const chunks = [];
     for await (const chunk of provider.chat({
       sessionId: crypto.randomUUID(),
-      messages: [{ role: 'user', content: 'What was top product by revenue last month? Use query_sales.' }],
+      messages: [
+        { role: 'user', content: 'What was top product by revenue last month? Use query_sales.' },
+      ],
       tools: [
         {
           name: 'query_sales',

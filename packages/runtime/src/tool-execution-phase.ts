@@ -36,7 +36,9 @@ async function executeToolWithTimeout(
 
   try {
     const raced = await Promise.race([
-      executor.call(toolName, input, context).then((result) => ({ kind: 'result' as const, result })),
+      executor
+        .call(toolName, input, context)
+        .then((result) => ({ kind: 'result' as const, result })),
       timeoutPromise,
     ]);
     if (raced.kind === 'timeout') {

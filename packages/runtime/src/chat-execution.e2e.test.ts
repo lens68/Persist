@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { executeChat } from './chat-execution.js';
-import type {
-  ChatProvider,
-  ChatRequest,
-  RuntimeChunk,
-  ToolExecutor,
-} from '@persist/shared';
+import type { ChatProvider, ChatRequest, RuntimeChunk, ToolExecutor } from '@persist/shared';
 import { QUERY_SALES_TOOL_DEFINITION } from '@persist/tool';
 import { RuleBasedMemoryGenerator } from '@persist/memory';
 import {
@@ -35,7 +30,13 @@ describe('sales e2e mock chain (FR-TOOL-16)', () => {
         providerCalls++;
         const messageId = crypto.randomUUID();
         if (providerCalls === 1) {
-          yield { type: 'message-start', sessionId: request.sessionId, messageId, role: 'assistant', timestamp: new Date() };
+          yield {
+            type: 'message-start',
+            sessionId: request.sessionId,
+            messageId,
+            role: 'assistant',
+            timestamp: new Date(),
+          };
           yield {
             type: 'tool-call-start',
             sessionId: request.sessionId,
@@ -52,7 +53,13 @@ describe('sales e2e mock chain (FR-TOOL-16)', () => {
             toolName: 'query_sales',
             arguments: '{"metric":"revenue","period":"last_month"}',
           };
-          yield { type: 'message-end', sessionId: request.sessionId, messageId, timestamp: new Date(), content: '' };
+          yield {
+            type: 'message-end',
+            sessionId: request.sessionId,
+            messageId,
+            timestamp: new Date(),
+            content: '',
+          };
           yield {
             type: 'done',
             sessionId: request.sessionId,
@@ -71,10 +78,34 @@ describe('sales e2e mock chain (FR-TOOL-16)', () => {
           };
           return;
         }
-        yield { type: 'message-start', sessionId: request.sessionId, messageId, role: 'assistant', timestamp: new Date() };
-        yield { type: 'text-delta', sessionId: request.sessionId, messageId, timestamp: new Date(), delta: 'Widget A leads sales.' };
-        yield { type: 'message-end', sessionId: request.sessionId, messageId, timestamp: new Date(), content: 'Widget A leads sales.' };
-        yield { type: 'done', sessionId: request.sessionId, messageId, completionState: 'completed', timestamp: new Date() };
+        yield {
+          type: 'message-start',
+          sessionId: request.sessionId,
+          messageId,
+          role: 'assistant',
+          timestamp: new Date(),
+        };
+        yield {
+          type: 'text-delta',
+          sessionId: request.sessionId,
+          messageId,
+          timestamp: new Date(),
+          delta: 'Widget A leads sales.',
+        };
+        yield {
+          type: 'message-end',
+          sessionId: request.sessionId,
+          messageId,
+          timestamp: new Date(),
+          content: 'Widget A leads sales.',
+        };
+        yield {
+          type: 'done',
+          sessionId: request.sessionId,
+          messageId,
+          completionState: 'completed',
+          timestamp: new Date(),
+        };
       },
     };
 

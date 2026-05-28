@@ -1,7 +1,4 @@
-import type {
-  CreateToolExecutionSnapshotInput,
-  ToolExecutionSnapshot,
-} from '../types/tool.js';
+import type { CreateToolExecutionSnapshotInput, ToolExecutionSnapshot } from '../types/tool.js';
 
 export interface ToolExecutionSnapshotStore {
   appendSnapshot(

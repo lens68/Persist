@@ -1,7 +1,11 @@
 import type { ChatProvider, ChatRequest } from '@persist/shared';
 import type { ProviderMetadata, RuntimeChunk, TokenUsage, ToolCallMetadata } from '@persist/shared';
 import { parseOpenAiSseStream } from './openai-stream-parser.js';
-import { mergeToolCallDelta, toOpenAiApiMessages, type AccumulatedToolCall } from './openai-messages.js';
+import {
+  mergeToolCallDelta,
+  toOpenAiApiMessages,
+  type AccumulatedToolCall,
+} from './openai-messages.js';
 
 export interface QwenProviderConfig {
   apiKey: string;

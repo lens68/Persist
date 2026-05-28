@@ -13,7 +13,9 @@ class InMemoryStore {
 
 describe('executeToolCallPhase', () => {
   it('emits tool-call-truncated for multiple tool calls (IC-TOOL-06)', async () => {
-    const store = new InMemoryStore() as unknown as Parameters<typeof executeToolCallPhase>[0]['store'];
+    const store = new InMemoryStore() as unknown as Parameters<
+      typeof executeToolCallPhase
+    >[0]['store'];
     const toolExecutor: ToolExecutor = {
       call: async () => ({ success: true, output: { ok: true } }),
     };
@@ -55,7 +57,9 @@ describe('executeToolCallPhase', () => {
   });
 
   it('failed tool still persists snapshot with failed status', async () => {
-    const store = new InMemoryStore() as unknown as Parameters<typeof executeToolCallPhase>[0]['store'];
+    const store = new InMemoryStore() as unknown as Parameters<
+      typeof executeToolCallPhase
+    >[0]['store'];
     const toolExecutor: ToolExecutor = {
       call: async () => ({
         success: false,

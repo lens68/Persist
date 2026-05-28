@@ -3,9 +3,7 @@ import { toOpenAiApiMessages, mergeToolCallDelta } from './openai-messages.js';
 
 describe('toOpenAiApiMessages', () => {
   it('maps tool messages with tool_call_id', () => {
-    const msgs = toOpenAiApiMessages([
-      { role: 'tool', content: '{}', toolCallId: 'call_1' },
-    ]);
+    const msgs = toOpenAiApiMessages([{ role: 'tool', content: '{}', toolCallId: 'call_1' }]);
     expect(msgs[0]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: '{}' });
   });
 
