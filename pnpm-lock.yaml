@@ -32,6 +32,9 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.2
         version: 10.1.0
+      '@persist/memory':
+        specifier: workspace:*
+        version: link:../../packages/memory
       '@persist/provider':
         specifier: workspace:*
         version: link:../../packages/provider

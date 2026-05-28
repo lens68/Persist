@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@persist/memory": "workspace:*",
     "@persist/provider": "workspace:*",
     "@persist/runtime": "workspace:*",
     "@persist/shared": "workspace:*",
