@@ -206,8 +206,8 @@ export default function HomePage() {
         Planning Execution Runtime — <strong>v0.4.0</strong>（Plan → 至多 1× Tool → Synthesis）
       </p>
       <p style={{ fontSize: 12, color: '#888', margin: '0 0 16px' }}>
-        聊天气泡仅显示最终助手回复；右侧 Planning 面板展示 Plan / 截断 / Replay 时间线（与 v0.3 FC 双
-        Provider 不同）。
+        聊天气泡仅显示最终助手回复；右侧 Planning 面板展示 Plan / 截断 / Replay 时间线（与 v0.3 FC
+        双 Provider 不同）。
       </p>
       {lastPlanHint && (
         <p style={{ fontSize: 12, color: '#3949ab', margin: '0 0 12px' }}>{lastPlanHint}</p>

@@ -140,9 +140,7 @@ export function PlanPanel({ replay, loading }: PlanPanelProps) {
               }}
             >
               <code>{t.toolName}</code> · {t.status}
-              {t.planStepId && (
-                <span style={{ color: '#666' }}> · planStep={t.planStepId}</span>
-              )}
+              {t.planStepId && <span style={{ color: '#666' }}> · planStep={t.planStepId}</span>}
               {t.toolOutput != null && (
                 <pre
                   style={{
