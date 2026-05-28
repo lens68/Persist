@@ -8,22 +8,128 @@
 
 **Persist v0.4.0 — Planning Runtime**
 
-`executeChat` 主路径重写为 **PlanGenerator → 至多 1× ToolExecutor → 单次 synthesis（无 tools）**。Provider Function Calling 不再是默认 tool 选择路径；Plan 存于 `PlanSnapshotStore`，不进 Message 时间线。
+在 v0.3 Tool-Augmented Runtime 上引入 **Planning Runtime**：`ExecutionPlan` 取代 Provider Function Calling 作为 tool 名称/参数/选择的唯一来源；`executeChat` 主路径重写为 **Memory injection（每 turn 一次）→ PlanGenerator → 至多 1× ToolExecutor → 单次 synthesis（无 tools）**；Plan 持久化于 `PlanSnapshotStore` 并可审计 replay。
+
+> Persist is fundamentally an execution runtime with persistence and replayability.
 
 ### Added
 
-- `@persist/plan` — ExecutionPlan 校验、首 tool step 选择、executionTrace 策略
-- `@persist/planning` — `RuleBasedPlanGenerator`（Sales demo，CI 默认）
-- `@persist/provider` — 可选 `LlmPlanGenerator`
-- **Planning 契约**（`@persist/shared`）：`PlanGenerator`、`PlanSnapshotStore`（含 `updateExecutionTrace`）、plan observability chunks、`SessionReplay.planSnapshots`
-- **Storage**：`plan_snapshots` 表；`tool_execution_snapshots.plan_id` / `plan_step_id`（`planId` = `PlanSnapshot.id`，非 ExecutionPlan 内嵌 id）
-- **Runtime**：`plan-generation-phase`、`plan-execution-phase`、`planned-tool-execution-phase`
+- **Monorepo 扩展**（pnpm workspaces）
+  - `@persist/plan` — 纯 policy（`validateExecutionPlan`、`selectFirstToolStep`、`buildInitialExecutionTrace` / `applyExecutionResults`；**无 I/O**）
+  - `@persist/planning` — `RuleBasedPlanGenerator`（Sales demo 关键词映射；CI / API 默认，无 API key）
+  - `@persist/provider` — 可选 `LlmPlanGenerator`（`provider.chat` 无 tools，JSON → `ExecutionPlan`）
+  - `@persist/runtime` — `plan-generation-phase` / `plan-execution-phase` / `planned-tool-execution-phase`；`memory-injection-phase`（从 v0.3 FC tool phase 拆分）
+  - `@persist/storage` — `SqlitePlanSnapshotStore`；`plan_snapshots` 表；`tool_execution_snapshots.plan_id` / `plan_step_id`
+  - `@persist/api` — DI：`RuleBasedPlanGenerator` + `SqlitePlanSnapshotStore`
+  - `@persist/web` — v0.4 UI；**Planning Runtime** 只读面板（Plan / executionTrace / Replay 时间线）；SSE 忽略 plan observability chunks
+
+- **Planning 契约**（`@persist/shared`）
+  - `ExecutionPlan` / `PlanStep` / `PlanSnapshot` / `PlanStepExecution`；`PLAN_RUNTIME_DEFAULTS`（`planningEnabled: true`）
+  - `PlanGenerator` / `PlanGenerationInput`（`resolvedMessages`；**禁止** `executeChat`）
+  - `PlanSnapshotStore`：`appendSnapshot` + `updateExecutionTrace`（两阶段 trace）
+  - 扩展 `ToolExecutionSnapshot`：`planId` / `planStepId`（`planId` = **`PlanSnapshot.id`**，非 ExecutionPlan 内嵌 id）
+  - 扩展 `SessionReplay.planSnapshots`
+  - RuntimeChunk observability：`plan-generated` / `plan-invalid` / `plan-step-start` / `plan-step-end` / `plan-step-truncated`
+
+- **Planning Runtime（v0.4 核心）**
+  - **ADR-PLAN-01**：tool 的 `name` / `input` **仅**来自 `ExecutionPlan`，非 Provider FC
+  - **ADR-PLAN-03**：Plan 可含多 `tool` step；Runtime **maxExecutableToolSteps = 1**；其余 `truncated`（`plan-step-truncated`）
+  - **ADR-PLAN-05 / IC-PLAN-08**：`plan-invalid` 或 Tool 失败 **仍** synthesis；仅 synthesis 失败时跳过 memory generation
+  - **ADR-PLAN-06 / IC-PLAN-09**：每 turn **单次** memory injection；synthesis 上下文来自 `getSessionWithMessages`（含 `role: tool` 消息）
+  - **IC-PLAN-10**：无 pre-tool assistant；每 turn **一条**最终 assistant 气泡
+  - `plan-invalid`：记录 invalid snapshot + synthetic response-only plan 后仍执行 synthesis
+
+- **RuntimeChunk 事件流**（在 v0.3 基础上扩展）
+  - Plan observability：`plan-generated` / `plan-invalid` / `plan-step-*`
+  - Tool execution chunks 保留：`tool-call-start` / `tool-call-end` / `tool-result`（由 planned step 驱动）
+  - 主路径 **不** emit `tool-call-truncated`（v0.3 FC 多 call 截断；v0.4 用 `plan-step-truncated`）
+
+- **REST API（v0.4）**
+  - `POST /api/sessions/:id/messages` — 流式 Chat（Planning 路径；Provider **不传** tools）
+  - `GET /api/sessions/:id/replay` — 含 `planSnapshots` + `toolExecutionSnapshots`（不重新调用 LLM / Tool / PlanGenerator）
+
+- **持久化模型**
+  - `plan_snapshots`：`planJson`、`status`、`executionTraceJson`、`invalidReason`
+  - `tool_execution_snapshots`：nullable `plan_id`、`plan_step_id`（legacy 行兼容）
+
+- **演示脚本**（`scripts/`，非构建产物）
+  - `run-planning-demo.mjs` — Planning + Sales 两场景（单 tool / 双 tool step 截断）
+  - `run-full-stack-demo.mjs` — 经 Web `:3000` 代理的全链路断言
+
+- **工程**
+  - `.gitattributes` — `* text=auto eol=lf`（避免 Windows CRLF 导致 CI Prettier 失败）
+
+- **测试** — Vitest（94 tests，1 skipped）：`packages/plan` / `planning` / plan storage replay、runtime IC-PLAN-09/10、v0.2 memory 回归
+
+- **CI/CD**
+  - CI：Prettier → ESLint → typecheck → test → build
+  - CD：main 分支构建产物（Actions Artifacts）
+  - Release：tag `v*.*.*` 触发 GitHub Release（runtime / api / web 构建包）
 
 ### Changed
 
-- **Breaking**：v0.3 FC 双 Provider 路径已移除；每 turn 仅一次 memory injection（IC-PLAN-09：synthesis 从 `getSessionWithMessages` 重建上下文）
-- Message 时间线（IC-PLAN-10）：`user → [tool] → assistant`（无 pre-tool assistant）
-- 多 tool plan step 由 `plan-step-truncated` 表达（主路径不 emit `tool-call-truncated`）
+- **Breaking — executeChat 主路径**
+  - 移除 v0.3：Provider #1（带 tools）→ FC → 第二次 memory injection → Provider #2
+  - 新路径：injection → plan → ≤1 tool → synthesis（单次 `provider.chat`，无 tools）
+- **Breaking — Message 时间线**：`user → [tool] → assistant`（v0.3 常为 `user → assistant#1 → tool → assistant#2`）
+- v0.2 Memory 语义保留（injection / generation / supersede）；阈值与 policy 未改
+
+### Fixed
+
+- Web `page.tsx` / `plan-panel.tsx` Prettier（CI `format:check` on Linux）
+- 移除未使用的 v0.3 `executeToolCallPhase`（FC 路径死代码）；memory injection 迁至 `memory-injection-phase.ts`
+
+### Architecture
+
+- Core（`shared` / `memory` / `tool` / `plan` / `runtime`）与 Integration（`planning` / `provider` / `storage` / `api` / `web`）分层
+- **Planning ≠ Execution**：Plan 在 `PlanSnapshotStore`；**不进** Message 时间线
+- `runtime` 依赖 `@persist/plan` policy；**禁止** import `@persist/planning` / `@persist/provider` / MCP
+- `planning` 仅依赖 `shared` + `plan`；`plan` 无 I/O（同 `tool` / `memory`）
+- **无 Agent Loop**：禁止 `while` replan、第二遍 plan、第二次 `ToolExecutor.call()`
+- Persistence-first：plan snapshot、executionTrace 更新、tool snapshot 均嵌入 `executeChat` 生命周期
+
+### 已知限制 / 集成说明
+
+- **默认 API DI**：`RuleBasedPlanGenerator`（非 `LlmPlanGenerator`）；Sales `query_sales` + `SqliteInProcessToolExecutor` 同 v0.3
+- **对比类问题**：RuleBased 可生成 2 个 tool step，但 Runtime 只执行第一个；助手可能说明缺第二期数据（设计行为，非 bug）
+- **executionTrace**：tool step `completed` 表示「Runtime 已尝试执行」；成败见 `ToolExecutionSnapshot.status`
+- **Web**：Planning 面板展示 Plan / trace；聊天气泡仍仅最终 assistant；无 Plan Timeline 拖拽编辑
+
+### 明确未包含（后续 Phase）
+
+- API 默认 `LlmPlanGenerator` / Plan 人工审批 UI
+- 每 turn 执行多个 tool step（当前硬封顶 1）
+- Cross-session / User Profile Memory
+- **Autonomous Agent Loop** / replan while
+- Auth / 多用户 / Vector DB / RAG / Event Bus / Workflow DSL
+
+### 快速开始
+
+```bash
+pnpm install
+# 在项目根目录创建 .env（勿提交），配置 DASHSCOPE_API_KEY、DATABASE_URL、SALES_FIXTURE_DATABASE_URL 等
+pnpm -r run build
+pnpm dev          # API :3001
+pnpm dev:web      # Web :3000
+```
+
+**Planning Demo（v0.4）**：
+
+1. **单 tool**：「请查询上个月（last_month）按 revenue 销量第一的产品」→ 右侧 Planning 面板见 1× tool + 1× response；Replay：`user → tool → assistant`；预期 **Widget A** / **12000**。
+2. **双 tool step 截断**：「请对比上月和上个季度 revenue 销量第一」→ Plan 含 2 tool steps；`step_tool_quarter` 为 **`truncated`**；仅 1 条 tool snapshot（`last_month`）。
+
+```bash
+node scripts/run-planning-demo.mjs
+# 或经 Web 代理：node scripts/run-full-stack-demo.mjs
+```
+
+审计：`GET /api/sessions/:id/replay` 查看 `planSnapshots` 与 `executionTrace`。
+
+v0.2 Memory 面板：同 Session 约 **8 条消息** 后出现 Active summary（与 v0.4 Planning 正交）。
+
+### 贡献者
+
+- lens68
 
 ## [0.3.0] - 2026-05-28
 
