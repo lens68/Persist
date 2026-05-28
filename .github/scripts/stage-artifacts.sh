@@ -47,4 +47,5 @@ fi
 
 echo "Staged ${FILE_COUNT} files in ${OUT_DIR}"
 echo "Sample web-next files:"
-find "${OUT_DIR}/web-next" -type f | head -5
+# head closes the pipe early; find then gets SIGPIPE — ignore under pipefail
+find "${OUT_DIR}/web-next" -type f 2>/dev/null | head -5 || true
