@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toOpenAiApiMessages, mergeToolCallDelta } from './openai-messages.js';
+import { toOpenAiApiMessages, mergeToolCallDelta, mergeToolCallMessage } from './openai-messages.js';
 
 describe('toOpenAiApiMessages', () => {
   it('maps tool messages with tool_call_id', () => {
@@ -18,6 +18,27 @@ describe('toOpenAiApiMessages', () => {
     expect(msgs[0]).toMatchObject({
       role: 'assistant',
       tool_calls: [{ id: 'c1', type: 'function' }],
+    });
+  });
+});
+
+describe('mergeToolCallMessage', () => {
+  it('parses complete message.tool_calls (vendor final chunk)', () => {
+    const acc = new Map<number, { id: string; name: string; arguments: string }>();
+    mergeToolCallMessage(acc, [
+      {
+        id: 'call_1',
+        type: 'function',
+        function: {
+          name: 'query_sales',
+          arguments: '{"metric":"revenue","period":"last_month"}',
+        },
+      },
+    ]);
+    expect(acc.get(0)).toEqual({
+      id: 'call_1',
+      name: 'query_sales',
+      arguments: '{"metric":"revenue","period":"last_month"}',
     });
   });
 });

@@ -104,6 +104,28 @@ describe('QwenProvider', () => {
     expect(requestBody?.tool_choice).toBe('required');
     expect(chunks.some((c) => c.type === 'tool-call-start')).toBe(true);
     expect(chunks.some((c) => c.type === 'tool-call-end')).toBe(true);
+
+    const providerMessageToolCalls = new QwenProvider({
+      apiKey: 'test-key',
+      fetchImpl: async () =>
+        sseResponse([
+          'data: {"choices":[{"index":0,"message":{"role":"assistant","tool_calls":[{"id":"call_2","type":"function","function":{"name":"query_sales","arguments":"{\\"metric\\":\\"revenue\\",\\"period\\":\\"last_month\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ]),
+    });
+    const msgChunks = [];
+    for await (const chunk of providerMessageToolCalls.chat({
+      sessionId: '550e8400-e29b-41d4-a716-446655440001',
+      messages: [{ role: 'user', content: 'sales' }],
+      tools: [{ name: 'query_sales', description: 'q', inputSchema: { type: 'object' } }],
+    })) {
+      msgChunks.push(chunk);
+    }
+    expect(msgChunks.some((c) => c.type === 'tool-call-end')).toBe(true);
+    const msgDone = msgChunks.find((c) => c.type === 'done');
+    expect(msgDone?.type === 'done' && msgDone.providerMetadata?.toolCalls?.[0]?.arguments).toContain(
+      'last_month',
+    );
     const done = chunks.find((c) => c.type === 'done');
     expect(done?.type === 'done' && done.providerMetadata?.toolCalls?.[0]?.name).toBe(
       'query_sales',

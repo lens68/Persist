@@ -31,6 +31,22 @@ export interface AccumulatedToolCall {
   arguments: string;
 }
 
+/** Merge complete tool_calls from a non-streaming `message` object (some vendors). */
+export function mergeToolCallMessage(
+  accumulated: Map<number, AccumulatedToolCall>,
+  toolCalls: Array<Record<string, unknown>>,
+): void {
+  toolCalls.forEach((tc, i) => {
+    const index = typeof tc.index === 'number' ? tc.index : i;
+    const fn = tc.function as Record<string, unknown> | undefined;
+    accumulated.set(index, {
+      id: typeof tc.id === 'string' ? tc.id : '',
+      name: fn && typeof fn.name === 'string' ? fn.name : '',
+      arguments: fn && typeof fn.arguments === 'string' ? fn.arguments : '',
+    });
+  });
+}
+
 /** Merge streaming tool_call deltas (OpenAI-compatible). */
 export function mergeToolCallDelta(
   accumulated: Map<number, AccumulatedToolCall>,

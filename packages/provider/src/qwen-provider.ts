@@ -3,6 +3,7 @@ import type { ProviderMetadata, RuntimeChunk, TokenUsage, ToolCallMetadata } fro
 import { parseOpenAiSseStream } from './openai-stream-parser.js';
 import {
   mergeToolCallDelta,
+  mergeToolCallMessage,
   toOpenAiApiMessages,
   type AccumulatedToolCall,
 } from './openai-messages.js';
@@ -139,6 +140,12 @@ export class QwenProvider implements ChatProvider {
       const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
       if (deltaToolCalls && deltaToolCalls.length > 0) {
         mergeToolCallDelta(toolCallAccum, deltaToolCalls);
+      }
+
+      const message = choice?.message as Record<string, unknown> | undefined;
+      const messageToolCalls = message?.tool_calls as Array<Record<string, unknown>> | undefined;
+      if (messageToolCalls && messageToolCalls.length > 0) {
+        mergeToolCallMessage(toolCallAccum, messageToolCalls);
       }
 
       const fr = choice?.finish_reason;
