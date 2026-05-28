@@ -2,13 +2,19 @@ import type {
   CreateMemoryEntryInput,
   CreateMemoryInjectionSnapshotInput,
   CreateMessageInput,
+  CreatePlanSnapshotInput,
   CreateSessionInput,
   CreateToolExecutionSnapshotInput,
+  ExecutionPlan,
   InjectionSnapshotStore,
   MemoryEntry,
   MemoryInjectionSnapshot,
   MemoryStore,
   Message,
+  PlanGenerator,
+  PlanSnapshot,
+  PlanSnapshotStore,
+  PlanStepExecution,
   Session,
   SessionReplay,
   SessionStore,
@@ -19,6 +25,16 @@ import type {
 
 export class InMemorySessionStore implements SessionStore {
   private sessions = new Map<string, { id: string; messages: Message[] }>();
+  private planSnapshots: PlanSnapshot[] = [];
+  private toolSnapshots: ToolExecutionSnapshot[] = [];
+
+  setPlanSnapshotsForReplay(snapshots: PlanSnapshot[]) {
+    this.planSnapshots = snapshots;
+  }
+
+  setToolSnapshotsForReplay(snapshots: ToolExecutionSnapshot[]) {
+    this.toolSnapshots = snapshots;
+  }
 
   async createSession(_input: CreateSessionInput): Promise<Session> {
     const id = crypto.randomUUID();
@@ -80,7 +96,8 @@ export class InMemorySessionStore implements SessionStore {
       messages,
       memories: [],
       injectionSnapshots: [],
-      toolExecutionSnapshots: [],
+      toolExecutionSnapshots: this.toolSnapshots.filter((t) => t.sessionId === sessionId),
+      planSnapshots: this.planSnapshots.filter((p) => p.sessionId === sessionId),
       reconstructedAt: new Date(),
     };
   }
@@ -178,6 +195,8 @@ export class InMemoryToolSnapshotStore implements ToolExecutionSnapshotStore {
       id: crypto.randomUUID(),
       sessionId,
       triggerMessageId: input.triggerMessageId,
+      planId: input.planId,
+      planStepId: input.planStepId,
       toolName: input.toolName,
       toolInput: input.toolInput,
       toolOutput: input.toolOutput,
@@ -193,4 +212,45 @@ export class InMemoryToolSnapshotStore implements ToolExecutionSnapshotStore {
   async listSnapshots(sessionId: string): Promise<ToolExecutionSnapshot[]> {
     return this.snapshots.filter((s) => s.sessionId === sessionId);
   }
+}
+
+export class InMemoryPlanSnapshotStore implements PlanSnapshotStore {
+  snapshots: PlanSnapshot[] = [];
+
+  async appendSnapshot(sessionId: string, input: CreatePlanSnapshotInput): Promise<PlanSnapshot> {
+    const snap: PlanSnapshot = {
+      id: input.id ?? crypto.randomUUID(),
+      sessionId,
+      triggerMessageId: input.triggerMessageId,
+      plan: input.plan,
+      status: input.status,
+      executionTrace: input.executionTrace,
+      invalidReason: input.invalidReason,
+      createdAt: new Date(),
+    };
+    this.snapshots.push(snap);
+    return snap;
+  }
+
+  async updateExecutionTrace(
+    sessionId: string,
+    snapshotId: string,
+    executionTrace: PlanStepExecution[],
+  ): Promise<PlanSnapshot> {
+    const snap = this.snapshots.find((s) => s.id === snapshotId && s.sessionId === sessionId);
+    if (!snap) throw new Error(`Plan snapshot ${snapshotId} not found`);
+    snap.executionTrace = executionTrace;
+    return snap;
+  }
+
+  async listSnapshots(sessionId: string): Promise<PlanSnapshot[]> {
+    return this.snapshots.filter((s) => s.sessionId === sessionId);
+  }
+}
+
+export function createMockPlanGenerator(plan: ExecutionPlan): PlanGenerator {
+  return {
+    id: 'mock-plan',
+    generatePlan: async () => plan,
+  };
 }

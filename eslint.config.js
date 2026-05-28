@@ -31,6 +31,7 @@ export default tseslint.config(
   },
   {
     files: ['packages/runtime/**/*.ts'],
+    ignores: ['packages/runtime/**/*.test.ts', 'packages/runtime/**/*.e2e.test.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -44,6 +45,7 @@ export default tseslint.config(
                 '@persist/provider',
                 '@persist/storage',
                 '@persist/mcp-tool-adapter',
+                '@persist/planning',
               ],
               message: 'Core packages must remain framework- and provider-agnostic.',
             },
@@ -104,6 +106,59 @@ export default tseslint.config(
             {
               group: ['@persist/runtime'],
               message: 'MCP adapter must not depend on runtime.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/plan/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'fastify',
+                'next',
+                'ai',
+                '@persist/provider',
+                '@persist/runtime',
+                '@persist/storage',
+                '@persist/mcp-tool-adapter',
+                'better-sqlite3',
+                'drizzle-orm',
+              ],
+              message: 'Plan package is pure policy — no I/O or integration deps.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/planning/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'fastify',
+                'next',
+                'ai',
+                '@persist/provider',
+                '@persist/runtime',
+                '@persist/storage',
+                '@persist/mcp-tool-adapter',
+                '@persist/tool',
+                'better-sqlite3',
+                'drizzle-orm',
+              ],
+              message: 'Planning package may only depend on shared and plan.',
             },
           ],
         },

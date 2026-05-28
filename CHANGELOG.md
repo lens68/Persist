@@ -2,6 +2,29 @@
 
 本文件记录 Persist 的版本变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.4.0] - 2026-05-28
+
+### 概述
+
+**Persist v0.4.0 — Planning Runtime**
+
+`executeChat` 主路径重写为 **PlanGenerator → 至多 1× ToolExecutor → 单次 synthesis（无 tools）**。Provider Function Calling 不再是默认 tool 选择路径；Plan 存于 `PlanSnapshotStore`，不进 Message 时间线。
+
+### Added
+
+- `@persist/plan` — ExecutionPlan 校验、首 tool step 选择、executionTrace 策略
+- `@persist/planning` — `RuleBasedPlanGenerator`（Sales demo，CI 默认）
+- `@persist/provider` — 可选 `LlmPlanGenerator`
+- **Planning 契约**（`@persist/shared`）：`PlanGenerator`、`PlanSnapshotStore`（含 `updateExecutionTrace`）、plan observability chunks、`SessionReplay.planSnapshots`
+- **Storage**：`plan_snapshots` 表；`tool_execution_snapshots.plan_id` / `plan_step_id`（`planId` = `PlanSnapshot.id`，非 ExecutionPlan 内嵌 id）
+- **Runtime**：`plan-generation-phase`、`plan-execution-phase`、`planned-tool-execution-phase`
+
+### Changed
+
+- **Breaking**：v0.3 FC 双 Provider 路径已移除；每 turn 仅一次 memory injection（IC-PLAN-09：synthesis 从 `getSessionWithMessages` 重建上下文）
+- Message 时间线（IC-PLAN-10）：`user → [tool] → assistant`（无 pre-tool assistant）
+- 多 tool plan step 由 `plan-step-truncated` 表达（主路径不 emit `tool-call-truncated`）
+
 ## [0.3.0] - 2026-05-28
 
 ### 概述

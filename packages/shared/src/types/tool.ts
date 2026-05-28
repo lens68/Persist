@@ -41,6 +41,8 @@ export const ToolExecutionSnapshotSchema = z.object({
   id: z.string().uuid(),
   sessionId: z.string().uuid(),
   triggerMessageId: z.string().uuid(),
+  planId: z.string().uuid().nullable().optional(),
+  planStepId: z.string().nullable().optional(),
   toolName: z.string(),
   toolInput: z.unknown(),
   toolOutput: z.unknown(),

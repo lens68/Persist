@@ -4,6 +4,8 @@ import type {
   InjectionSnapshotStore,
   MemoryGenerator,
   MemoryStore,
+  PlanGenerator,
+  PlanSnapshotStore,
   SessionStore,
   ToolDefinition,
   ToolExecutionSnapshotStore,
@@ -19,6 +21,8 @@ export interface ApiDeps {
   memoryStore: MemoryStore;
   injectionSnapshotStore: InjectionSnapshotStore;
   toolExecutionSnapshotStore: ToolExecutionSnapshotStore;
+  planSnapshotStore: PlanSnapshotStore;
+  planGenerator: PlanGenerator;
   provider: ChatProvider;
   memoryGenerator: MemoryGenerator;
   toolExecutor: ToolExecutor;
@@ -31,6 +35,8 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     memoryStore,
     injectionSnapshotStore,
     toolExecutionSnapshotStore,
+    planSnapshotStore,
+    planGenerator,
     provider,
     memoryGenerator,
     toolExecutor,
@@ -76,6 +82,8 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     const stream = executeChat(
       {
         provider,
+        planGenerator,
+        planSnapshotStore,
         store,
         memoryStore,
         injectionSnapshotStore,

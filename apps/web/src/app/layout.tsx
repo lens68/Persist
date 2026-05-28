@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Persist',
-  description: 'Stateful Chat Runtime — UI shell',
+  title: 'Persist v0.4 — Planning Runtime',
+  description: 'Planning Execution Runtime — Plan, Tool, Synthesis',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

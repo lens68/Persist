@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { LlmSummaryMemoryGenerator, QwenProvider } from '@persist/provider';
+import { RuleBasedPlanGenerator } from '@persist/planning';
 import {
   createDatabase,
   SqliteInjectionSnapshotStore,
   SqliteInProcessToolExecutor,
   SqliteMemoryStore,
+  SqlitePlanSnapshotStore,
   SqliteSessionStore,
   SqliteToolExecutionSnapshotStore,
   initSalesFixtureDb,
@@ -36,6 +38,8 @@ async function main() {
   const memoryStore = new SqliteMemoryStore(db);
   const injectionSnapshotStore = new SqliteInjectionSnapshotStore(db);
   const toolExecutionSnapshotStore = new SqliteToolExecutionSnapshotStore(db);
+  const planSnapshotStore = new SqlitePlanSnapshotStore(db);
+  const planGenerator = new RuleBasedPlanGenerator();
   const toolExecutor = new SqliteInProcessToolExecutor({
     fixtureDatabaseUrl: salesFixtureUrl,
   });
@@ -56,6 +60,8 @@ async function main() {
     memoryStore,
     injectionSnapshotStore,
     toolExecutionSnapshotStore,
+    planSnapshotStore,
+    planGenerator,
     provider,
     memoryGenerator,
     toolExecutor,

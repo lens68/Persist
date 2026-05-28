@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import type { ChatMessage } from '@persist/shared';
+import type { ChatMessage, ExecutionPlan, PlanStepExecution } from '@persist/shared';
 
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
@@ -29,12 +29,29 @@ export const messages = sqliteTable('messages', {
   completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
 });
 
+export const planSnapshots = sqliteTable('plan_snapshots', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  triggerMessageId: text('trigger_message_id').notNull(),
+  planJson: text('plan_json', { mode: 'json' }).$type<ExecutionPlan | null>(),
+  status: text('status', { enum: ['valid', 'invalid'] }).notNull(),
+  executionTraceJson: text('execution_trace_json', { mode: 'json' })
+    .$type<PlanStepExecution[]>()
+    .notNull(),
+  invalidReason: text('invalid_reason'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+});
+
 export const toolExecutionSnapshots = sqliteTable('tool_execution_snapshots', {
   id: text('id').primaryKey(),
   sessionId: text('session_id')
     .notNull()
     .references(() => sessions.id, { onDelete: 'cascade' }),
   triggerMessageId: text('trigger_message_id').notNull(),
+  planId: text('plan_id'),
+  planStepId: text('plan_step_id'),
   toolName: text('tool_name').notNull(),
   toolInputJson: text('tool_input_json', { mode: 'json' }).notNull(),
   toolOutputJson: text('tool_output_json', { mode: 'json' }).notNull(),

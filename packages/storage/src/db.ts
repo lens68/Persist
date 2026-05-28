@@ -70,7 +70,28 @@ export function migrateDatabase(sqlite: Database.Database) {
       status TEXT NOT NULL,
       payload_truncated INTEGER
     );
+    CREATE TABLE IF NOT EXISTS plan_snapshots (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      trigger_message_id TEXT NOT NULL,
+      plan_json TEXT,
+      status TEXT NOT NULL,
+      execution_trace_json TEXT NOT NULL,
+      invalid_reason TEXT,
+      created_at INTEGER NOT NULL
+    );
   `);
+
+  const toolCols = sqlite.prepare(`PRAGMA table_info(tool_execution_snapshots)`).all() as {
+    name: string;
+  }[];
+  const toolColNames = new Set(toolCols.map((c) => c.name));
+  if (!toolColNames.has('plan_id')) {
+    sqlite.exec(`ALTER TABLE tool_execution_snapshots ADD COLUMN plan_id TEXT`);
+  }
+  if (!toolColNames.has('plan_step_id')) {
+    sqlite.exec(`ALTER TABLE tool_execution_snapshots ADD COLUMN plan_step_id TEXT`);
+  }
 
   const messageCols = sqlite.prepare(`PRAGMA table_info(messages)`).all() as { name: string }[];
   const colNames = new Set(messageCols.map((c) => c.name));

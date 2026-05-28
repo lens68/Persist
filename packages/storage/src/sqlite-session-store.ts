@@ -147,6 +147,12 @@ export class SqliteSessionStore implements SessionStore {
       .where(eq(schema.toolExecutionSnapshots.sessionId, sessionId))
       .orderBy(asc(schema.toolExecutionSnapshots.startedAt));
 
+    const planSnapshotRows = await this.db
+      .select()
+      .from(schema.planSnapshots)
+      .where(eq(schema.planSnapshots.sessionId, sessionId))
+      .orderBy(asc(schema.planSnapshots.createdAt));
+
     const { messages, ...sessionOnly } = swm;
     return {
       session: sessionOnly,
@@ -174,6 +180,8 @@ export class SqliteSessionStore implements SessionStore {
         id: row.id,
         sessionId: row.sessionId,
         triggerMessageId: row.triggerMessageId,
+        planId: row.planId ?? undefined,
+        planStepId: row.planStepId ?? undefined,
         toolName: row.toolName,
         toolInput: row.toolInputJson,
         toolOutput: row.toolOutputJson,
@@ -181,6 +189,16 @@ export class SqliteSessionStore implements SessionStore {
         completedAt: row.completedAt,
         status: row.status as 'completed' | 'failed' | 'timeout',
         payloadTruncated: row.payloadTruncated ?? undefined,
+      })),
+      planSnapshots: planSnapshotRows.map((row) => ({
+        id: row.id,
+        sessionId: row.sessionId,
+        triggerMessageId: row.triggerMessageId,
+        plan: row.planJson,
+        status: row.status,
+        executionTrace: row.executionTraceJson,
+        invalidReason: row.invalidReason ?? undefined,
+        createdAt: row.createdAt,
       })),
       reconstructedAt: new Date(),
     };

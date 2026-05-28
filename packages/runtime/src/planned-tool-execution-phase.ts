@@ -1,6 +1,4 @@
 import type {
-  MemoryInjectionSnapshot,
-  MemoryStore,
   Message,
   RuntimeChunk,
   SessionStore,
@@ -10,17 +8,7 @@ import type {
   ToolExecutionStatus,
 } from '@persist/shared';
 import { TOOL_RUNTIME_DEFAULTS } from '@persist/shared';
-import { performMemoryInjection, resolveActiveSummary } from '@persist/memory';
-import type { InjectionSnapshotStore } from '@persist/shared';
-import { truncatePayload, truncateToolCalls } from '@persist/tool';
-
-function parseToolArguments(args: string): unknown {
-  try {
-    return JSON.parse(args) as unknown;
-  } catch {
-    return args;
-  }
-}
+import { truncatePayload } from '@persist/tool';
 
 async function executeToolWithTimeout(
   executor: ToolExecutor,
@@ -60,48 +48,8 @@ async function executeToolWithTimeout(
   }
 }
 
-export async function* runMemoryInjectionPhase(
-  deps: {
-    store: SessionStore;
-    memoryStore: MemoryStore;
-    injectionSnapshotStore: InjectionSnapshotStore;
-  },
-  params: { sessionId: string; triggerMessageId: string },
-): AsyncGenerator<RuntimeChunk, MemoryInjectionSnapshot> {
-  const { sessionId, triggerMessageId } = params;
-  const updated = await deps.store.getSessionWithMessages(sessionId);
-  if (!updated) {
-    throw new Error('Session not found for memory injection');
-  }
-
-  const memories = await deps.memoryStore.listMemories(sessionId);
-  const activeSummary = resolveActiveSummary(memories);
-  const injection = performMemoryInjection({
-    sessionId,
-    triggerMessageId,
-    messages: updated.messages,
-    activeSummary,
-  });
-
-  const persistedSnapshot = await deps.injectionSnapshotStore.appendInjectionSnapshot(sessionId, {
-    sessionId,
-    triggerMessageId: injection.snapshot.triggerMessageId,
-    injectedMemoryIds: injection.snapshot.injectedMemoryIds,
-    resolvedMessages: injection.resolvedMessages,
-    strategy: injection.snapshot.strategy,
-  });
-
-  yield {
-    type: 'memory-injected',
-    sessionId,
-    timestamp: new Date(),
-    snapshot: persistedSnapshot,
-  };
-
-  return persistedSnapshot;
-}
-
-export async function* executeToolCallPhase(
+/** Execute a single planned tool step (ADR-PLAN-03/04). No FC truncation chunks. */
+export async function* executePlannedToolStep(
   deps: {
     store: SessionStore;
     toolExecutor: ToolExecutor;
@@ -110,29 +58,26 @@ export async function* executeToolCallPhase(
   params: {
     sessionId: string;
     triggerMessageId: string;
-    toolCalls: { id: string; name: string; arguments: string }[];
+    planId: string;
+    planStepId: string;
+    toolName: string;
+    input: unknown;
     signal?: AbortSignal;
   },
-): AsyncGenerator<RuntimeChunk, Message | null> {
-  const { sessionId, triggerMessageId, toolCalls, signal } = params;
-  const { selected, truncated } = truncateToolCalls(toolCalls);
+): AsyncGenerator<RuntimeChunk, Message> {
+  const { sessionId, triggerMessageId, planId, planStepId, toolName, input, signal } = params;
+  const toolCallId = planStepId;
 
-  if (truncated) {
-    yield {
-      type: 'tool-call-truncated',
-      sessionId,
-      timestamp: new Date(),
-      requestedCount: toolCalls.length,
-      executedToolCallId: selected!.id,
-    };
-  }
+  yield {
+    type: 'tool-call-start',
+    sessionId,
+    timestamp: new Date(),
+    toolCallId,
+    toolName,
+    arguments: JSON.stringify(input ?? {}),
+  };
 
-  if (!selected) {
-    return null;
-  }
-
-  const toolInput = parseToolArguments(selected.arguments);
-  const inputTrunc = truncatePayload(toolInput);
+  const inputTrunc = truncatePayload(input);
   if (inputTrunc.truncated) {
     yield {
       type: 'tool-payload-truncated',
@@ -147,8 +92,8 @@ export async function* executeToolCallPhase(
   const startedAt = new Date();
   const { result, status } = await executeToolWithTimeout(
     deps.toolExecutor,
-    selected.name,
-    toolInput,
+    toolName,
+    inputTrunc.value,
     { sessionId, triggerMessageId, signal },
   );
   const completedAt = new Date();
@@ -173,7 +118,9 @@ export async function* executeToolCallPhase(
   await deps.toolExecutionSnapshotStore.appendSnapshot(sessionId, {
     sessionId,
     triggerMessageId,
-    toolName: selected.name,
+    planId,
+    planStepId,
+    toolName,
     toolInput: inputTrunc.value,
     toolOutput: outputTrunc.value,
     startedAt,
@@ -189,17 +136,26 @@ export async function* executeToolCallPhase(
   const toolMessage = await deps.store.appendMessage(sessionId, {
     role: 'tool',
     content: toolContent,
-    toolCallId: selected.id,
-    toolName: selected.name,
+    toolCallId,
+    toolName,
     completionState: 'completed',
   });
+
+  yield {
+    type: 'tool-call-end',
+    sessionId,
+    timestamp: new Date(),
+    toolCallId,
+    toolName,
+    arguments: JSON.stringify(inputTrunc.value ?? {}),
+  };
 
   yield {
     type: 'tool-result',
     sessionId,
     timestamp: new Date(),
-    toolCallId: selected.id,
-    toolName: selected.name,
+    toolCallId,
+    toolName,
     messageId: toolMessage.id,
     success: result.success,
   };

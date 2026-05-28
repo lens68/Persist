@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@persist/memory": "workspace:*",
+    "@persist/planning": "workspace:*",
     "@persist/provider": "workspace:*",
     "@persist/runtime": "workspace:*",
     "@persist/shared": "workspace:*",

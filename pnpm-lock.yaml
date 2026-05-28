@@ -35,6 +35,9 @@ importers:
       '@persist/memory':
         specifier: workspace:*
         version: link:../../packages/memory
+      '@persist/planning':
+        specifier: workspace:*
+        version: link:../../packages/planning
       '@persist/provider':
         specifier: workspace:*
         version: link:../../packages/provider
@@ -115,11 +118,40 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/plan:
+    dependencies:
+      '@persist/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@persist/tool':
+        specifier: workspace:*
+        version: link:../tool
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/planning:
+    dependencies:
+      '@persist/plan':
+        specifier: workspace:*
+        version: link:../plan
+      '@persist/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/provider:
     dependencies:
       '@persist/memory':
         specifier: workspace:*
         version: link:../memory
+      '@persist/plan':
+        specifier: workspace:*
+        version: link:../plan
       '@persist/shared':
         specifier: workspace:*
         version: link:../shared
@@ -133,6 +165,9 @@ importers:
       '@persist/memory':
         specifier: workspace:*
         version: link:../memory
+      '@persist/plan':
+        specifier: workspace:*
+        version: link:../plan
       '@persist/shared':
         specifier: workspace:*
         version: link:../shared
@@ -140,6 +175,9 @@ importers:
         specifier: workspace:*
         version: link:../tool
     devDependencies:
+      '@persist/planning':
+        specifier: workspace:*
+        version: link:../planning
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

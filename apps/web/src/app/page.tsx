@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MemoryPanel, type MemoryEntryView } from './memory-panel';
+import { PlanPanel, type ReplayView } from './plan-panel';
 
 interface Message {
   role: string;
@@ -17,6 +18,11 @@ const IGNORED_SSE_TYPES = new Set([
   'tool-call-truncated',
   'tool-payload-truncated',
   'tool-result',
+  'plan-generated',
+  'plan-invalid',
+  'plan-step-start',
+  'plan-step-end',
+  'plan-step-truncated',
 ]);
 
 export default function HomePage() {
@@ -24,6 +30,9 @@ export default function HomePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [memories, setMemories] = useState<MemoryEntryView[]>([]);
   const [memoriesLoading, setMemoriesLoading] = useState(false);
+  const [replay, setReplay] = useState<ReplayView | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [lastPlanHint, setLastPlanHint] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const assistantRef = useRef('');
@@ -39,6 +48,18 @@ export default function HomePage() {
       (m) => m.role === 'user' || (m.role === 'assistant' && m.content?.trim()),
     );
     setMessages(visible.map((m) => ({ role: m.role, content: m.content })));
+  }, []);
+
+  const loadReplay = useCallback(async (sid: string) => {
+    setReplayLoading(true);
+    try {
+      const res = await fetch(`/api/sessions/${sid}/replay`);
+      if (res.ok) {
+        setReplay((await res.json()) as ReplayView);
+      }
+    } finally {
+      setReplayLoading(false);
+    }
   }, []);
 
   const loadMemories = useCallback(async (sid: string) => {
@@ -114,6 +135,14 @@ export default function HomePage() {
             messageId?: string;
             message?: string;
           };
+          if (chunk.type === 'plan-generated') {
+            const p = chunk as { plan?: { steps?: unknown[] } };
+            setLastPlanHint(`Plan 已生成 · ${p.plan?.steps?.length ?? 0} steps`);
+          }
+          if (chunk.type === 'plan-step-truncated') {
+            const p = chunk as { stepId?: string };
+            setLastPlanHint(`Plan step 已截断（未执行）: ${p.stepId ?? '?'}`);
+          }
           if (IGNORED_SSE_TYPES.has(chunk.type)) {
             continue;
           }
@@ -167,18 +196,26 @@ export default function HomePage() {
     setStreaming(false);
     await syncMessagesFromServer(sid);
     await loadMemories(sid);
+    await loadReplay(sid);
   };
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '0 16px' }}>
       <h1>Persist</h1>
-      <p style={{ color: '#666' }}>
-        Tool-augmented Execution Runtime — v0.3 UI shell（仅 HTTP，无 Runtime 逻辑）
+      <p style={{ color: '#666', margin: '0 0 4px' }}>
+        Planning Execution Runtime — <strong>v0.4.0</strong>（Plan → 至多 1× Tool → Synthesis）
       </p>
+      <p style={{ fontSize: 12, color: '#888', margin: '0 0 16px' }}>
+        聊天气泡仅显示最终助手回复；右侧 Planning 面板展示 Plan / 截断 / Replay 时间线（与 v0.3 FC 双
+        Provider 不同）。
+      </p>
+      {lastPlanHint && (
+        <p style={{ fontSize: 12, color: '#3949ab', margin: '0 0 12px' }}>{lastPlanHint}</p>
+      )}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 320px',
+          gridTemplateColumns: '1fr 340px',
           gap: 16,
           alignItems: 'start',
         }}
@@ -216,7 +253,10 @@ export default function HomePage() {
             </button>
           </div>
         </section>
-        <MemoryPanel memories={memories} loading={memoriesLoading} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <PlanPanel replay={replay} loading={replayLoading} />
+          <MemoryPanel memories={memories} loading={memoriesLoading} />
+        </div>
       </div>
       {sessionId && (
         <p style={{ fontSize: 12, color: '#999', marginTop: 16 }}>Session: {sessionId}</p>

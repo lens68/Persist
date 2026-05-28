@@ -1,5 +1,5 @@
 {
-  "name": "@persist/runtime",
+  "name": "@persist/planning",
   "version": "0.4.0",
   "private": true,
   "type": "module",
@@ -14,16 +14,13 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config ../../vitest.config.ts packages/runtime"
+    "test": "vitest run --config ../../vitest.config.ts packages/planning"
   },
   "dependencies": {
-    "@persist/memory": "workspace:*",
     "@persist/plan": "workspace:*",
-    "@persist/shared": "workspace:*",
-    "@persist/tool": "workspace:*"
+    "@persist/shared": "workspace:*"
   },
   "devDependencies": {
-    "@persist/planning": "workspace:*",
     "typescript": "^5.7.2"
   }
 }

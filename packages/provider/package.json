@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@persist/memory": "workspace:*",
+    "@persist/plan": "workspace:*",
     "@persist/shared": "workspace:*"
   },
   "devDependencies": {

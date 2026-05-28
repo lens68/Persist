@@ -3,22 +3,29 @@ import type {
   InjectionSnapshotStore,
   MemoryGenerator,
   MemoryStore,
+  PlanGenerator,
+  PlanSnapshotStore,
   RuntimeChunk,
   SessionStore,
   ToolDefinition,
   ToolExecutionSnapshotStore,
   ToolExecutor,
 } from '@persist/shared';
+import { toChatMessages } from '@persist/shared';
 import { assertMaxRegisteredTools } from '@persist/tool';
 import type { ChatExecutionInput } from './chat-execution-types.js';
 import { runMemoryGenerationPipeline } from './memory-generation-pipeline.js';
+import { finalizePlanTraceAfterSynthesis, runPlanExecutionPhase } from './plan-execution-phase.js';
+import { runPlanGenerationPhase } from './plan-generation-phase.js';
 import { runProviderChatPhase } from './provider-chat-phase.js';
-import { executeToolCallPhase, runMemoryInjectionPhase } from './tool-execution-phase.js';
+import { runMemoryInjectionPhase } from './memory-injection-phase.js';
 
 export type { ChatExecutionInput } from './chat-execution-types.js';
 
 export interface ChatExecutionDeps {
   provider: ChatProvider;
+  planGenerator: PlanGenerator;
+  planSnapshotStore: PlanSnapshotStore;
   store: SessionStore;
   memoryStore: MemoryStore;
   injectionSnapshotStore: InjectionSnapshotStore;
@@ -29,7 +36,7 @@ export interface ChatExecutionDeps {
 }
 
 /**
- * Persistence-aware chat execution with memory + optional single tool call (§9).
+ * v0.4 Planning path: injection once → plan → at most one tool → synthesis (no tools).
  */
 export async function* executeChat(
   deps: ChatExecutionDeps,
@@ -37,6 +44,8 @@ export async function* executeChat(
 ): AsyncIterable<RuntimeChunk> {
   const {
     provider,
+    planGenerator,
+    planSnapshotStore,
     store,
     memoryStore,
     injectionSnapshotStore,
@@ -84,75 +93,104 @@ export async function* executeChat(
     yield injectionResult.value;
     injectionResult = await injectionGen.next();
   }
-  const firstSnapshot = injectionResult.value;
+  const injectionSnapshot = injectionResult.value;
 
-  const provider1Gen = runProviderChatPhase(provider, store, {
-    sessionId,
-    messages: firstSnapshot.resolvedMessages,
-    model,
-    signal,
-    tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
-  });
-  let provider1Result = await provider1Gen.next();
-  while (!provider1Result.done) {
-    yield provider1Result.value;
-    provider1Result = await provider1Gen.next();
-  }
-  const phase1 = provider1Result.value;
-
-  if (!phase1.executionCompleted) {
-    return;
-  }
-
-  const hasToolCall = phase1.toolCalls.length > 0;
-
-  if (!hasToolCall) {
-    for await (const genChunk of runMemoryGenerationPipeline({
+  const planGen = runPlanGenerationPhase(
+    { planGenerator, planSnapshotStore, toolDefinitions },
+    {
       sessionId,
+      triggerMessageId,
+      resolvedMessages: injectionSnapshot.resolvedMessages,
+    },
+  );
+  let planGenResult = await planGen.next();
+  while (!planGenResult.done) {
+    yield planGenResult.value;
+    planGenResult = await planGen.next();
+  }
+  const { planSnapshot, effectivePlan } = planGenResult.value;
+
+  const planExecGen = runPlanExecutionPhase(
+    {
       store,
-      memoryStore,
-      memoryGenerator,
-    })) {
-      yield genChunk;
-    }
+      toolExecutor,
+      toolExecutionSnapshotStore,
+      planSnapshotStore,
+    },
+    {
+      sessionId,
+      triggerMessageId,
+      planSnapshot,
+      plan: effectivePlan,
+      signal,
+    },
+  );
+  let planExecResult = await planExecGen.next();
+  while (!planExecResult.done) {
+    yield planExecResult.value;
+    planExecResult = await planExecGen.next();
+  }
+  const { executedToolStepId, truncatedToolStepIds } = planExecResult.value;
+
+  const sessionForSynthesis = await store.getSessionWithMessages(sessionId);
+  if (!sessionForSynthesis) {
+    yield {
+      type: 'error',
+      sessionId,
+      timestamp: new Date(),
+      code: 'session_not_found',
+      message: `Session ${sessionId} not found for synthesis`,
+      recoverable: false,
+    };
+    yield {
+      type: 'done',
+      sessionId,
+      completionState: 'failed',
+      timestamp: new Date(),
+    };
     return;
   }
 
-  const toolGen = executeToolCallPhase(
-    { store, toolExecutor, toolExecutionSnapshotStore },
-    { sessionId, triggerMessageId, toolCalls: phase1.toolCalls, signal },
-  );
-  let toolResult = await toolGen.next();
-  while (!toolResult.done) {
-    yield toolResult.value;
-    toolResult = await toolGen.next();
-  }
+  const synthesisMessages = toChatMessages(sessionForSynthesis.messages);
 
-  const injection2Gen = runMemoryInjectionPhase(
-    { store, memoryStore, injectionSnapshotStore },
-    { sessionId, triggerMessageId },
-  );
-  let injection2Result = await injection2Gen.next();
-  while (!injection2Result.done) {
-    yield injection2Result.value;
-    injection2Result = await injection2Gen.next();
-  }
-  const secondSnapshot = injection2Result.value;
-
-  const provider2Gen = runProviderChatPhase(provider, store, {
+  const synthesisGen = runProviderChatPhase(provider, store, {
     sessionId,
-    messages: secondSnapshot.resolvedMessages,
+    messages: synthesisMessages,
     model,
     signal,
   });
-  let provider2Result = await provider2Gen.next();
-  while (!provider2Result.done) {
-    yield provider2Result.value;
-    provider2Result = await provider2Gen.next();
+  let synthesisResult = await synthesisGen.next();
+  while (!synthesisResult.done) {
+    yield synthesisResult.value;
+    synthesisResult = await synthesisGen.next();
   }
-  const phase2 = provider2Result.value;
+  const synthesisPhase = synthesisResult.value;
 
-  if (phase2.executionCompleted) {
+  await finalizePlanTraceAfterSynthesis(planSnapshotStore, {
+    sessionId,
+    planSnapshot,
+    plan: effectivePlan,
+    executedToolStepId,
+    truncatedToolStepIds,
+    synthesisCompleted: synthesisPhase.executionCompleted,
+    synthesisFailed: !synthesisPhase.executionCompleted,
+  });
+
+  for (const step of effectivePlan.steps) {
+    if (step.type === 'response') {
+      yield {
+        type: 'plan-step-end',
+        sessionId,
+        timestamp: new Date(),
+        planSnapshotId: planSnapshot.id,
+        stepId: step.id,
+        stepType: 'response',
+        status: synthesisPhase.executionCompleted ? 'completed' : 'skipped',
+      };
+    }
+  }
+
+  if (synthesisPhase.executionCompleted) {
     for await (const genChunk of runMemoryGenerationPipeline({
       sessionId,
       store,
