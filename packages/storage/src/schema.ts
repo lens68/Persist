@@ -17,6 +17,8 @@ export const messages = sqliteTable('messages', {
     .references(() => sessions.id, { onDelete: 'cascade' }),
   role: text('role', { enum: ['system', 'user', 'assistant', 'tool'] }).notNull(),
   content: text('content').notNull(),
+  toolCallId: text('tool_call_id'),
+  toolName: text('tool_name'),
   completionState: text('completion_state', {
     enum: ['pending', 'streaming', 'completed', 'failed', 'aborted'],
   })
@@ -25,6 +27,21 @@ export const messages = sqliteTable('messages', {
   providerMetadata: text('provider_metadata', { mode: 'json' }).$type<Record<string, unknown>>(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+});
+
+export const toolExecutionSnapshots = sqliteTable('tool_execution_snapshots', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  triggerMessageId: text('trigger_message_id').notNull(),
+  toolName: text('tool_name').notNull(),
+  toolInputJson: text('tool_input_json', { mode: 'json' }).notNull(),
+  toolOutputJson: text('tool_output_json', { mode: 'json' }).notNull(),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }).notNull(),
+  status: text('status', { enum: ['completed', 'failed', 'timeout'] }).notNull(),
+  payloadTruncated: integer('payload_truncated', { mode: 'boolean' }),
 });
 
 export const memoryEntries = sqliteTable('memory_entries', {

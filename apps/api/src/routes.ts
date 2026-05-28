@@ -5,21 +5,39 @@ import type {
   MemoryGenerator,
   MemoryStore,
   SessionStore,
+  ToolDefinition,
+  ToolExecutionSnapshotStore,
+  ToolExecutor,
 } from '@persist/shared';
 import { CreateSessionInputSchema } from '@persist/shared';
 import { executeChat } from '@persist/runtime';
+import { assertMaxRegisteredTools } from '@persist/tool';
 import { writeRuntimeChunkSse } from './sse.js';
 
 export interface ApiDeps {
   store: SessionStore;
   memoryStore: MemoryStore;
   injectionSnapshotStore: InjectionSnapshotStore;
+  toolExecutionSnapshotStore: ToolExecutionSnapshotStore;
   provider: ChatProvider;
   memoryGenerator: MemoryGenerator;
+  toolExecutor: ToolExecutor;
+  toolDefinitions: ToolDefinition[];
 }
 
 export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
-  const { store, memoryStore, injectionSnapshotStore, provider, memoryGenerator } = deps;
+  const {
+    store,
+    memoryStore,
+    injectionSnapshotStore,
+    toolExecutionSnapshotStore,
+    provider,
+    memoryGenerator,
+    toolExecutor,
+    toolDefinitions,
+  } = deps;
+
+  assertMaxRegisteredTools(toolDefinitions.length);
 
   app.post('/api/sessions', async (request, reply) => {
     const body = CreateSessionInputSchema.safeParse(request.body ?? {});
@@ -56,7 +74,16 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     }
 
     const stream = executeChat(
-      { provider, store, memoryStore, injectionSnapshotStore, memoryGenerator },
+      {
+        provider,
+        store,
+        memoryStore,
+        injectionSnapshotStore,
+        memoryGenerator,
+        toolExecutor,
+        toolDefinitions,
+        toolExecutionSnapshotStore,
+      },
       { sessionId, userContent: content, model: body?.model },
     );
 

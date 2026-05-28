@@ -12,6 +12,7 @@ export default tseslint.config(
       'apps/web/next-env.d.ts',
       'AGENTS.md',
       'docs/**',
+      'scripts/**',
     ],
   },
   eslint.configs.recommended,
@@ -29,7 +30,30 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/runtime/**/*.ts', 'packages/shared/**/*.ts'],
+    files: ['packages/runtime/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'fastify',
+                'next',
+                'ai',
+                '@persist/provider',
+                '@persist/storage',
+                '@persist/mcp-tool-adapter',
+              ],
+              message: 'Core packages must remain framework- and provider-agnostic.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/shared/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -38,6 +62,48 @@ export default tseslint.config(
             {
               group: ['fastify', 'next', 'ai', '@persist/provider', '@persist/storage'],
               message: 'Core packages must remain framework- and provider-agnostic.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/tool/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'fastify',
+                'next',
+                'ai',
+                '@persist/provider',
+                '@persist/runtime',
+                '@persist/storage',
+                '@persist/mcp-tool-adapter',
+                'better-sqlite3',
+                'drizzle-orm',
+              ],
+              message: 'Tool package is pure policy — no I/O or integration deps.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/mcp-tool-adapter/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@persist/runtime'],
+              message: 'MCP adapter must not depend on runtime.',
             },
           ],
         },

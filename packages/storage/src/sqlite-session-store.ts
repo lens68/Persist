@@ -70,6 +70,8 @@ export class SqliteSessionStore implements SessionStore {
       sessionId,
       role: input.role,
       content: input.content,
+      toolCallId: input.toolCallId ?? null,
+      toolName: input.toolName ?? null,
       completionState,
       providerMetadata: input.providerMetadata ?? null,
       createdAt: now,
@@ -86,6 +88,8 @@ export class SqliteSessionStore implements SessionStore {
       sessionId,
       role: input.role,
       content: input.content,
+      toolCallId: input.toolCallId,
+      toolName: input.toolName,
       completionState,
       providerMetadata: input.providerMetadata,
       createdAt: now,
@@ -137,6 +141,12 @@ export class SqliteSessionStore implements SessionStore {
       .where(eq(schema.injectionSnapshots.sessionId, sessionId))
       .orderBy(asc(schema.injectionSnapshots.createdAt));
 
+    const toolSnapshotRows = await this.db
+      .select()
+      .from(schema.toolExecutionSnapshots)
+      .where(eq(schema.toolExecutionSnapshots.sessionId, sessionId))
+      .orderBy(asc(schema.toolExecutionSnapshots.startedAt));
+
     const { messages, ...sessionOnly } = swm;
     return {
       session: sessionOnly,
@@ -160,6 +170,18 @@ export class SqliteSessionStore implements SessionStore {
         strategy: row.strategy,
         createdAt: row.createdAt,
       })),
+      toolExecutionSnapshots: toolSnapshotRows.map((row) => ({
+        id: row.id,
+        sessionId: row.sessionId,
+        triggerMessageId: row.triggerMessageId,
+        toolName: row.toolName,
+        toolInput: row.toolInputJson,
+        toolOutput: row.toolOutputJson,
+        startedAt: row.startedAt,
+        completedAt: row.completedAt,
+        status: row.status as 'completed' | 'failed' | 'timeout',
+        payloadTruncated: row.payloadTruncated ?? undefined,
+      })),
       reconstructedAt: new Date(),
     };
   }
@@ -181,6 +203,8 @@ export class SqliteSessionStore implements SessionStore {
       sessionId: row.sessionId,
       role: row.role,
       content: row.content,
+      toolCallId: row.toolCallId ?? undefined,
+      toolName: row.toolName ?? undefined,
       completionState: row.completionState as StreamCompletionState,
       providerMetadata: row.providerMetadata as ProviderMetadata | undefined,
       createdAt: row.createdAt,

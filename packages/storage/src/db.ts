@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path';
 
 export function createDatabase(databaseUrl: string) {
   const raw = databaseUrl.replace(/^file:/, '');
-  const isMemory = raw.startsWith(':memory:');
+  const isMemory = raw === ':memory:' || raw.startsWith(':memory:');
   const filePath = isMemory ? raw : resolve(raw);
   if (!isMemory) {
     mkdirSync(dirname(filePath), { recursive: true });
@@ -58,5 +58,26 @@ export function migrateDatabase(sqlite: Database.Database) {
       resolved_messages_json TEXT NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS tool_execution_snapshots (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      trigger_message_id TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      tool_input_json TEXT NOT NULL,
+      tool_output_json TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      completed_at INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      payload_truncated INTEGER
+    );
   `);
+
+  const messageCols = sqlite.prepare(`PRAGMA table_info(messages)`).all() as { name: string }[];
+  const colNames = new Set(messageCols.map((c) => c.name));
+  if (!colNames.has('tool_call_id')) {
+    sqlite.exec(`ALTER TABLE messages ADD COLUMN tool_call_id TEXT`);
+  }
+  if (!colNames.has('tool_name')) {
+    sqlite.exec(`ALTER TABLE messages ADD COLUMN tool_name TEXT`);
+  }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@persist/runtime",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "@persist/memory": "workspace:*",
-    "@persist/shared": "workspace:*"
+    "@persist/shared": "workspace:*",
+    "@persist/tool": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

@@ -23,6 +23,8 @@ export const MessageSchema = z.object({
   sessionId: z.string().uuid(),
   role: MessageRoleSchema,
   content: z.string(),
+  toolCallId: z.string().optional(),
+  toolName: z.string().optional(),
   providerMetadata: ProviderMetadataSchema.optional(),
   completionState: StreamCompletionStateSchema.default('completed'),
   createdAt: z.coerce.date(),
@@ -36,6 +38,8 @@ export const CreateMessageInputSchema = z.object({
   id: z.string().uuid().optional(),
   role: MessageRoleSchema,
   content: z.string(),
+  toolCallId: z.string().optional(),
+  toolName: z.string().optional(),
   completionState: StreamCompletionStateSchema.optional(),
   providerMetadata: ProviderMetadataSchema.optional(),
 });

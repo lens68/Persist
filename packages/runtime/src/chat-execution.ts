@@ -3,14 +3,17 @@ import type {
   InjectionSnapshotStore,
   MemoryGenerator,
   MemoryStore,
-  ProviderMetadata,
   RuntimeChunk,
   SessionStore,
+  ToolDefinition,
+  ToolExecutionSnapshotStore,
+  ToolExecutor,
 } from '@persist/shared';
-import { isObservabilityChunk } from '@persist/shared';
-import { performMemoryInjection, resolveActiveSummary } from '@persist/memory';
+import { assertMaxRegisteredTools } from '@persist/tool';
 import type { ChatExecutionInput } from './chat-execution-types.js';
 import { runMemoryGenerationPipeline } from './memory-generation-pipeline.js';
+import { runProviderChatPhase } from './provider-chat-phase.js';
+import { executeToolCallPhase, runMemoryInjectionPhase } from './tool-execution-phase.js';
 
 export type { ChatExecutionInput } from './chat-execution-types.js';
 
@@ -20,16 +23,28 @@ export interface ChatExecutionDeps {
   memoryStore: MemoryStore;
   injectionSnapshotStore: InjectionSnapshotStore;
   memoryGenerator: MemoryGenerator;
+  toolExecutor: ToolExecutor;
+  toolDefinitions: ToolDefinition[];
+  toolExecutionSnapshotStore: ToolExecutionSnapshotStore;
 }
 
 /**
- * Persistence-aware chat execution with continuity injection + post-execution generation (§9).
+ * Persistence-aware chat execution with memory + optional single tool call (§9).
  */
 export async function* executeChat(
   deps: ChatExecutionDeps,
   input: ChatExecutionInput,
 ): AsyncIterable<RuntimeChunk> {
-  const { provider, store, memoryStore, injectionSnapshotStore, memoryGenerator } = deps;
+  const {
+    provider,
+    store,
+    memoryStore,
+    injectionSnapshotStore,
+    memoryGenerator,
+    toolExecutor,
+    toolDefinitions,
+    toolExecutionSnapshotStore,
+  } = deps;
   const { sessionId, userContent, model, signal } = input;
 
   const session = await store.getSessionWithMessages(sessionId);
@@ -58,123 +73,86 @@ export async function* executeChat(
   });
   const triggerMessageId = userMessage.id;
 
-  const updated = await store.getSessionWithMessages(sessionId);
-  if (!updated) {
-    yield {
-      type: 'error',
-      sessionId,
-      timestamp: new Date(),
-      code: 'session_load_failed',
-      message: 'Failed to reload session after user message',
-    };
+  assertMaxRegisteredTools(toolDefinitions.length);
+
+  const injectionGen = runMemoryInjectionPhase(
+    { store, memoryStore, injectionSnapshotStore },
+    { sessionId, triggerMessageId },
+  );
+  let injectionResult = await injectionGen.next();
+  while (!injectionResult.done) {
+    yield injectionResult.value;
+    injectionResult = await injectionGen.next();
+  }
+  const firstSnapshot = injectionResult.value;
+
+  const provider1Gen = runProviderChatPhase(provider, store, {
+    sessionId,
+    messages: firstSnapshot.resolvedMessages,
+    model,
+    signal,
+    tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+  });
+  let provider1Result = await provider1Gen.next();
+  while (!provider1Result.done) {
+    yield provider1Result.value;
+    provider1Result = await provider1Gen.next();
+  }
+  const phase1 = provider1Result.value;
+
+  if (!phase1.executionCompleted) {
     return;
   }
 
-  const memories = await memoryStore.listMemories(sessionId);
-  const activeSummary = resolveActiveSummary(memories);
+  const hasToolCall = phase1.toolCalls.length > 0;
 
-  const injection = performMemoryInjection({
-    sessionId,
-    triggerMessageId,
-    messages: updated.messages,
-    activeSummary,
-  });
-
-  const persistedSnapshot = await injectionSnapshotStore.appendInjectionSnapshot(sessionId, {
-    sessionId,
-    triggerMessageId: injection.snapshot.triggerMessageId,
-    injectedMemoryIds: injection.snapshot.injectedMemoryIds,
-    resolvedMessages: injection.resolvedMessages,
-    strategy: injection.snapshot.strategy,
-  });
-
-  yield {
-    type: 'memory-injected',
-    sessionId,
-    timestamp: new Date(),
-    snapshot: persistedSnapshot,
-  };
-
-  let assistantMessageId: string | undefined;
-  let accumulated = '';
-  let providerMetadata: ProviderMetadata | undefined;
-  let executionCompleted = false;
-
-  for await (const chunk of provider.chat({
-    sessionId,
-    messages: persistedSnapshot.resolvedMessages,
-    model,
-    signal,
-  })) {
-    if (isObservabilityChunk(chunk)) {
-      continue;
+  if (!hasToolCall) {
+    for await (const genChunk of runMemoryGenerationPipeline({
+      sessionId,
+      store,
+      memoryStore,
+      memoryGenerator,
+    })) {
+      yield genChunk;
     }
-
-    if (chunk.type === 'message-start') {
-      assistantMessageId = chunk.messageId;
-      await store.appendMessage(sessionId, {
-        id: chunk.messageId,
-        role: 'assistant',
-        content: '',
-        completionState: 'streaming',
-      });
-    }
-
-    if (chunk.type === 'text-delta' && assistantMessageId) {
-      accumulated += chunk.delta;
-      await store.updateMessage(sessionId, assistantMessageId, {
-        content: accumulated,
-        completionState: 'streaming',
-      });
-    }
-
-    if (chunk.type === 'usage' && assistantMessageId) {
-      providerMetadata = {
-        ...providerMetadata,
-        usage: chunk.usage,
-      };
-      await store.updateMessage(sessionId, assistantMessageId, {
-        providerMetadata,
-      });
-    }
-
-    if (chunk.type === 'message-end' && assistantMessageId) {
-      accumulated = chunk.content;
-      await store.updateMessage(sessionId, assistantMessageId, {
-        content: accumulated,
-        completionState: 'streaming',
-      });
-    }
-
-    if (chunk.type === 'done') {
-      if (chunk.providerMetadata) {
-        providerMetadata = { ...providerMetadata, ...chunk.providerMetadata };
-      }
-      if (assistantMessageId) {
-        await store.updateMessage(sessionId, assistantMessageId, {
-          content: accumulated,
-          completionState: chunk.completionState === 'completed' ? 'completed' : 'failed',
-          providerMetadata,
-          completedAt: new Date(),
-        });
-      }
-      if (chunk.completionState === 'completed') {
-        executionCompleted = true;
-      }
-    }
-
-    if (chunk.type === 'error' && assistantMessageId) {
-      await store.updateMessage(sessionId, assistantMessageId, {
-        content: accumulated,
-        completionState: 'failed',
-        completedAt: new Date(),
-      });
-    }
-
-    yield chunk;
+    return;
   }
 
-  if (executionCompleted) {
+  const toolGen = executeToolCallPhase(
+    { store, toolExecutor, toolExecutionSnapshotStore },
+    { sessionId, triggerMessageId, toolCalls: phase1.toolCalls, signal },
+  );
+  let toolResult = await toolGen.next();
+  while (!toolResult.done) {
+    yield toolResult.value;
+    toolResult = await toolGen.next();
+  }
+
+  const injection2Gen = runMemoryInjectionPhase(
+    { store, memoryStore, injectionSnapshotStore },
+    { sessionId, triggerMessageId },
+  );
+  let injection2Result = await injection2Gen.next();
+  while (!injection2Result.done) {
+    yield injection2Result.value;
+    injection2Result = await injection2Gen.next();
+  }
+  const secondSnapshot = injection2Result.value;
+
+  const provider2Gen = runProviderChatPhase(provider, store, {
+    sessionId,
+    messages: secondSnapshot.resolvedMessages,
+    model,
+    signal,
+  });
+  let provider2Result = await provider2Gen.next();
+  while (!provider2Result.done) {
+    yield provider2Result.value;
+    provider2Result = await provider2Gen.next();
+  }
+  const phase2 = provider2Result.value;
+
+  if (phase2.executionCompleted) {
     for await (const genChunk of runMemoryGenerationPipeline({
       sessionId,
       store,

@@ -2,7 +2,13 @@ import type { ChatMessage, Message } from '@persist/shared';
 import { resolveMemoryPolicy, type MemoryPolicyConfig } from '../constants/config.js';
 
 export function messageToChatMessage(message: Message): ChatMessage {
-  return { role: message.role, content: message.content };
+  const msg: ChatMessage = { role: message.role, content: message.content };
+  if (message.toolCallId !== undefined) msg.toolCallId = message.toolCallId;
+  if (message.toolName !== undefined) msg.toolName = message.toolName;
+  if (message.role === 'assistant' && message.providerMetadata?.toolCalls) {
+    msg.toolCalls = message.providerMetadata.toolCalls;
+  }
+  return msg;
 }
 
 export function messagesToChatMessages(messages: Message[]): ChatMessage[] {

@@ -45,6 +45,28 @@ export const DoneChunkSchema = BaseChunkSchema.extend({
   providerMetadata: ProviderMetadataSchema.optional(),
 });
 
+export const ToolCallStartChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('tool-call-start'),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  arguments: z.string(),
+});
+
+export const ToolCallEndChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('tool-call-end'),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  arguments: z.string(),
+});
+
+export const ToolResultChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('tool-result'),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  messageId: z.string().uuid(),
+  success: z.boolean(),
+});
+
 /** Observability: runtime injected continuity before provider.chat (FR-MEM-11). */
 export const MemoryInjectedChunkSchema = BaseChunkSchema.extend({
   type: z.literal('memory-injected'),
@@ -57,6 +79,21 @@ export const MemoryGeneratedChunkSchema = BaseChunkSchema.extend({
   memory: MemoryEntrySchema,
 });
 
+/** Observability: multiple tool_calls truncated to first (IC-TOOL-06). */
+export const ToolCallTruncatedChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('tool-call-truncated'),
+  requestedCount: z.number().int().positive(),
+  executedToolCallId: z.string(),
+});
+
+/** Observability: tool payload truncated (IC-TOOL-12). */
+export const ToolPayloadTruncatedChunkSchema = BaseChunkSchema.extend({
+  type: z.literal('tool-payload-truncated'),
+  field: z.enum(['toolInput', 'toolOutput']),
+  originalLength: z.number().int().positive(),
+  maxLength: z.number().int().positive(),
+});
+
 export const ExecutionChunkSchema = z.discriminatedUnion('type', [
   TextDeltaChunkSchema,
   MessageStartChunkSchema,
@@ -64,11 +101,16 @@ export const ExecutionChunkSchema = z.discriminatedUnion('type', [
   UsageChunkSchema,
   ErrorChunkSchema,
   DoneChunkSchema,
+  ToolCallStartChunkSchema,
+  ToolCallEndChunkSchema,
+  ToolResultChunkSchema,
 ]);
 
 export const ObservabilityChunkSchema = z.discriminatedUnion('type', [
   MemoryInjectedChunkSchema,
   MemoryGeneratedChunkSchema,
+  ToolCallTruncatedChunkSchema,
+  ToolPayloadTruncatedChunkSchema,
 ]);
 
 export const RuntimeChunkSchema = z.discriminatedUnion('type', [
@@ -78,8 +120,13 @@ export const RuntimeChunkSchema = z.discriminatedUnion('type', [
   UsageChunkSchema,
   ErrorChunkSchema,
   DoneChunkSchema,
+  ToolCallStartChunkSchema,
+  ToolCallEndChunkSchema,
+  ToolResultChunkSchema,
   MemoryInjectedChunkSchema,
   MemoryGeneratedChunkSchema,
+  ToolCallTruncatedChunkSchema,
+  ToolPayloadTruncatedChunkSchema,
 ]);
 
 export type RuntimeChunk = z.infer<typeof RuntimeChunkSchema>;
@@ -89,12 +136,23 @@ export type MessageEndChunk = z.infer<typeof MessageEndChunkSchema>;
 export type UsageChunk = z.infer<typeof UsageChunkSchema>;
 export type ErrorChunk = z.infer<typeof ErrorChunkSchema>;
 export type DoneChunk = z.infer<typeof DoneChunkSchema>;
+export type ToolCallStartChunk = z.infer<typeof ToolCallStartChunkSchema>;
+export type ToolCallEndChunk = z.infer<typeof ToolCallEndChunkSchema>;
+export type ToolResultChunk = z.infer<typeof ToolResultChunkSchema>;
 export type MemoryInjectedChunk = z.infer<typeof MemoryInjectedChunkSchema>;
 export type MemoryGeneratedChunk = z.infer<typeof MemoryGeneratedChunkSchema>;
+export type ToolCallTruncatedChunk = z.infer<typeof ToolCallTruncatedChunkSchema>;
+export type ToolPayloadTruncatedChunk = z.infer<typeof ToolPayloadTruncatedChunkSchema>;
 export type ExecutionChunk = z.infer<typeof ExecutionChunkSchema>;
 export type ObservabilityChunk = z.infer<typeof ObservabilityChunkSchema>;
 
-export const OBSERVABILITY_CHUNK_TYPES = ['memory-injected', 'memory-generated'] as const;
+export const OBSERVABILITY_CHUNK_TYPES = [
+  'memory-injected',
+  'memory-generated',
+  'tool-call-truncated',
+  'tool-payload-truncated',
+] as const;
+
 export type ObservabilityChunkType = (typeof OBSERVABILITY_CHUNK_TYPES)[number];
 
 export function isObservabilityChunk(chunk: RuntimeChunk): chunk is ObservabilityChunk {

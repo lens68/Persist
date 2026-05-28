@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MessageSchema } from './message.js';
 import { MemoryEntrySchema, MemoryInjectionSnapshotSchema } from './memory.js';
+import { ToolExecutionSnapshotSchema } from './tool.js';
 
 export const SessionSchema = z.object({
   id: z.string().uuid(),
@@ -34,6 +35,7 @@ export const SessionReplaySchema = z.object({
   messages: z.array(MessageSchema),
   memories: z.array(MemoryEntrySchema).default([]),
   injectionSnapshots: z.array(MemoryInjectionSnapshotSchema).default([]),
+  toolExecutionSnapshots: z.array(ToolExecutionSnapshotSchema).default([]),
   reconstructedAt: z.coerce.date(),
 });
 

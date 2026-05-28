@@ -1,6 +1,7 @@
 import type { ChatProvider, ChatRequest } from '@persist/shared';
-import type { ProviderMetadata, RuntimeChunk, TokenUsage } from '@persist/shared';
+import type { ProviderMetadata, RuntimeChunk, TokenUsage, ToolCallMetadata } from '@persist/shared';
 import { parseOpenAiSseStream } from './openai-stream-parser.js';
+import { mergeToolCallDelta, toOpenAiApiMessages, type AccumulatedToolCall } from './openai-messages.js';
 
 export interface QwenProviderConfig {
   apiKey: string;
@@ -43,17 +44,30 @@ export class QwenProvider implements ChatProvider {
       timestamp: new Date(),
     } satisfies RuntimeChunk;
 
+    const body: Record<string, unknown> = {
+      model,
+      messages: toOpenAiApiMessages(request.messages),
+      stream: true,
+    };
+    if (request.tools && request.tools.length > 0) {
+      body.tools = request.tools.map((t) => ({
+        type: 'function',
+        function: {
+          name: t.name,
+          description: t.description,
+          parameters: t.inputSchema,
+        },
+      }));
+      body.tool_choice = 'auto';
+    }
+
     const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages: request.messages,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
       signal: request.signal,
     });
 
@@ -96,6 +110,8 @@ export class QwenProvider implements ChatProvider {
     let usage: TokenUsage | undefined;
     let finishReason: string | undefined;
     let requestId: string | undefined;
+    const toolCallAccum = new Map<number, AccumulatedToolCall>();
+    const emittedToolStarts = new Set<string>();
 
     for await (const event of parseOpenAiSseStream(response.body)) {
       const id = typeof event.id === 'string' ? event.id : undefined;
@@ -114,6 +130,24 @@ export class QwenProvider implements ChatProvider {
           timestamp: new Date(),
           delta: text,
         };
+      }
+
+      const deltaToolCalls = delta?.tool_calls as Array<Record<string, unknown>> | undefined;
+      if (deltaToolCalls && deltaToolCalls.length > 0) {
+        mergeToolCallDelta(toolCallAccum, deltaToolCalls);
+        for (const tc of toolCallAccum.values()) {
+          if (tc.id && tc.name && !emittedToolStarts.has(tc.id)) {
+            emittedToolStarts.add(tc.id);
+            yield {
+              type: 'tool-call-start',
+              sessionId: request.sessionId,
+              timestamp: new Date(),
+              toolCallId: tc.id,
+              toolName: tc.name,
+              arguments: tc.arguments,
+            };
+          }
+        }
       }
 
       const fr = choice?.finish_reason;
@@ -137,6 +171,21 @@ export class QwenProvider implements ChatProvider {
       }
     }
 
+    const toolCalls: ToolCallMetadata[] = [...toolCallAccum.values()]
+      .filter((tc) => tc.id && tc.name)
+      .map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments }));
+
+    for (const tc of toolCalls) {
+      yield {
+        type: 'tool-call-end',
+        sessionId: request.sessionId,
+        timestamp: new Date(),
+        toolCallId: tc.id,
+        toolName: tc.name,
+        arguments: tc.arguments,
+      };
+    }
+
     yield {
       type: 'message-end',
       sessionId: request.sessionId,
@@ -152,6 +201,7 @@ export class QwenProvider implements ChatProvider {
       finishReason,
       usage,
       latencyMs,
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
     };
 
     yield {

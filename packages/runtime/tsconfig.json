@@ -6,5 +6,5 @@
     "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../shared" }, { "path": "../memory" }]
+  "references": [{ "path": "../shared" }, { "path": "../memory" }, { "path": "../tool" }]
 }

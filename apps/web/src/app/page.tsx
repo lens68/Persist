@@ -8,6 +8,17 @@ interface Message {
   content: string;
 }
 
+/** SSE chunks that must not drive the chat bubble (observability + tool execution). */
+const IGNORED_SSE_TYPES = new Set([
+  'memory-injected',
+  'memory-generated',
+  'tool-call-start',
+  'tool-call-end',
+  'tool-call-truncated',
+  'tool-payload-truncated',
+  'tool-result',
+]);
+
 export default function HomePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -83,7 +94,7 @@ export default function HomePage() {
         if (data === '[DONE]') continue;
         try {
           const chunk = JSON.parse(data) as { type: string; delta?: string; content?: string };
-          if (chunk.type === 'memory-injected' || chunk.type === 'memory-generated') {
+          if (IGNORED_SSE_TYPES.has(chunk.type)) {
             continue;
           }
           if (chunk.type === 'text-delta' && chunk.delta) {
@@ -97,8 +108,16 @@ export default function HomePage() {
               return next;
             });
           }
-          if (chunk.type === 'message-end' && chunk.content) {
+          if (chunk.type === 'message-end' && chunk.content?.trim()) {
             assistantRef.current = chunk.content;
+            setMessages((prev) => {
+              const next = [...prev];
+              const last = next[next.length - 1];
+              if (last?.role === 'assistant') {
+                next[next.length - 1] = { role: 'assistant', content: assistantRef.current };
+              }
+              return next;
+            });
           }
         } catch {
           // ignore parse errors
@@ -114,7 +133,7 @@ export default function HomePage() {
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '0 16px' }}>
       <h1>Persist</h1>
       <p style={{ color: '#666' }}>
-        Memory-aware Execution Runtime — v0.2 UI shell（仅 HTTP，无 Runtime 逻辑）
+        Tool-augmented Execution Runtime — v0.3 UI shell（仅 HTTP，无 Runtime 逻辑）
       </p>
       <div
         style={{

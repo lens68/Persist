@@ -47,6 +47,9 @@ importers:
       '@persist/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@persist/tool':
+        specifier: workspace:*
+        version: link:../../packages/tool
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -86,6 +89,22 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/mcp-tool-adapter:
+    dependencies:
+      '@persist/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@persist/tool':
+        specifier: workspace:*
+        version: link:../tool
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.19)
+
   packages/memory:
     dependencies:
       '@persist/shared':
@@ -117,6 +136,9 @@ importers:
       '@persist/shared':
         specifier: workspace:*
         version: link:../shared
+      '@persist/tool':
+        specifier: workspace:*
+        version: link:../tool
     devDependencies:
       typescript:
         specifier: ^5.7.2
@@ -137,6 +159,9 @@ importers:
       '@persist/shared':
         specifier: workspace:*
         version: link:../shared
+      '@persist/tool':
+        specifier: workspace:*
+        version: link:../tool
       better-sqlite3:
         specifier: ^11.7.0
         version: 11.10.0
@@ -150,6 +175,19 @@ importers:
       drizzle-kit:
         specifier: ^0.30.1
         version: 0.30.6
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.19)
+
+  packages/tool:
+    dependencies:
+      '@persist/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
