@@ -123,9 +123,9 @@ describe('QwenProvider', () => {
     }
     expect(msgChunks.some((c) => c.type === 'tool-call-end')).toBe(true);
     const msgDone = msgChunks.find((c) => c.type === 'done');
-    expect(msgDone?.type === 'done' && msgDone.providerMetadata?.toolCalls?.[0]?.arguments).toContain(
-      'last_month',
-    );
+    expect(
+      msgDone?.type === 'done' && msgDone.providerMetadata?.toolCalls?.[0]?.arguments,
+    ).toContain('last_month');
     const done = chunks.find((c) => c.type === 'done');
     expect(done?.type === 'done' && done.providerMetadata?.toolCalls?.[0]?.name).toBe(
       'query_sales',

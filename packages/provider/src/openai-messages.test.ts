@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { toOpenAiApiMessages, mergeToolCallDelta, mergeToolCallMessage } from './openai-messages.js';
+import {
+  toOpenAiApiMessages,
+  mergeToolCallDelta,
+  mergeToolCallMessage,
+} from './openai-messages.js';
 
 describe('toOpenAiApiMessages', () => {
   it('maps tool messages with tool_call_id', () => {

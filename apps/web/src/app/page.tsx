@@ -119,10 +119,7 @@ export default function HomePage() {
           }
           if (chunk.type === 'message-start' && chunk.messageId) {
             const mid = chunk.messageId;
-            if (
-              streamingMessageIdRef.current &&
-              streamingMessageIdRef.current !== mid
-            ) {
+            if (streamingMessageIdRef.current && streamingMessageIdRef.current !== mid) {
               assistantRef.current = '';
               setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
             }
