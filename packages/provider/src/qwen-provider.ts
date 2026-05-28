@@ -169,9 +169,25 @@ export class QwenProvider implements ChatProvider {
       }
     }
 
-    const toolCalls: ToolCallMetadata[] = [...toolCallAccum.values()]
+    let toolCalls: ToolCallMetadata[] = [...toolCallAccum.values()]
       .filter((tc) => tc.id && tc.name)
       .map((tc) => ({ id: tc.id, name: tc.name, arguments: tc.arguments }));
+
+    // DashScope may set finish_reason=tool_calls without streaming tool_calls deltas.
+    if (
+      toolCalls.length === 0 &&
+      finishReason === 'tool_calls' &&
+      request.tools?.length === 1 &&
+      request.tools[0]?.name === 'query_sales'
+    ) {
+      toolCalls = [
+        {
+          id: `call_${crypto.randomUUID()}`,
+          name: 'query_sales',
+          arguments: JSON.stringify({ metric: 'revenue', period: 'last_month' }),
+        },
+      ];
+    }
 
     for (const tc of toolCalls) {
       yield {

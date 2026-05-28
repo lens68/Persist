@@ -58,7 +58,9 @@ export function mergeToolCallDelta(
     if (typeof tc.id === 'string') existing.id = tc.id;
     const fn = tc.function as Record<string, unknown> | undefined;
     if (fn && typeof fn.name === 'string') existing.name = fn.name;
+    if (typeof tc.name === 'string') existing.name = tc.name;
     if (fn && typeof fn.arguments === 'string') existing.arguments += fn.arguments;
+    if (typeof tc.arguments === 'string') existing.arguments += tc.arguments;
     accumulated.set(index, existing);
   }
 }
