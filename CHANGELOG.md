@@ -2,6 +2,70 @@
 
 本文件记录 Persist 的版本变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.4.1] - 2026-05-29
+
+### 概述
+
+**Persist v0.4.1 — Session History & Workspace Navigation**
+
+Product Capability Release：从 single-session Chat Demo 演进为 **multi-session Agent Workspace**。用户可查看、切换、恢复历史 Session，并在所选 Session 上**续聊**（Conversation Continuation）。历史加载走 Storage/Replay 读路径；续聊走既有 `POST /api/sessions/:id/messages` → `executeChat()`。
+
+> **Workspace ≠ User Memory**（OOS-05）。本版本不引入 Cross-session Memory / User Profile Memory。
+
+> **非 Runtime 演化**：`packages/runtime` 执行路径未改；无新 Planning / Tool / Memory 生命周期。
+
+### Added
+
+- **`SessionSummary` 契约**（`@persist/shared`）
+  - `SessionSummarySchema`：`id`、`createdAt`、`updatedAt`、`messageCount`、`previewText?`
+  - `SESSION_PREVIEW_TEXT_MAX_LENGTH = 24`（CFG-HISTORY-02）
+  - `SessionStore.listSessionSummaries({ limit? })`
+
+- **Storage 列表查询**（`SqliteSessionStore`）
+  - `updatedAt DESC` 排序；`previewText` = 最早 `role=user` 消息截断；`messageCount` = 全 role 计数
+  - **ADR-HISTORY-08**：`listSessionSummaries` 仅返回含至少 1 条 `role=user` 消息的 session
+
+- **REST API**
+  - `GET /api/sessions` → `SessionSummary[]`（CFG-HISTORY-01 默认 `limit=50`；CFG-HISTORY-03 clamp 1–200）
+  - Handler 仅 `SessionStore` 读路径，无 Runtime deps
+
+- **Web — Agent Workspace**
+  - Sidebar：Session 列表 + New Chat + 相对时间
+  - 路由 `/s/[sessionId]` + `localStorage`（`persist:lastSessionId`）
+  - 根 `/`：空态 B（New Chat 按钮，不自动 POST）+ localStorage redirect
+  - **ADR-HISTORY-08 Lazy Session Creation**：New Chat → `/s/new` 草稿态，**首条 user 消息**才 `POST /api/sessions`；列表仅含至少 1 条 `role=user` 的 session（无空 session 堆积）
+  - **replay-only** UI 灌数据（移除 Web 对 `GET :id` / `GET .../memories` 的调用）
+  - 流结束后：1× replay + 刷新 Sidebar
+  - FR-HISTORY-07：无效 Session / replay 404 时禁用输入，仅可 New Chat
+
+### Changed
+
+- **Web 入口**：主 UI 为 `/s/[sessionId]`；根 `/` 为空态或 localStorage redirect（不再 lazy-create 于首条消息）
+- **P1-2 修订（ADR-HISTORY-08）**：取代「New Chat 立即 POST」— 草稿 `/s/new` + 首条 user 消息持久化
+
+### 工程
+
+- Vitest **103 tests**（+9，含 `sqlite-session-history` 7 用例）；v0.4 runtime 无回归
+- CI：Prettier → ESLint → typecheck → test → build（与 v0.4.0 一致）
+
+### Out of Scope
+
+- OOS-01 Session Rename
+- OOS-02 Session Search
+- OOS-03 Session Folder
+- OOS-04 Session Share
+- OOS-05 Cross-session Memory / User Profile Memory
+- 编辑 / 删除 / 拖拽 Sidebar
+- `packages/runtime` 行为变更（除 `InMemorySessionStore` 接口 stub）
+
+### 验证
+
+- 全量 `pnpm test` 无 v0.4 回归
+- 手工 Web 验证入口：`http://localhost:3000/s/{sessionId}`（`/` 为空态或 redirect）
+- `run-full-stack-demo.mjs` / `run-planning-demo.mjs` 仍走 API 直连，脚本无需修改
+
+---
+
 ## [0.4.0] - 2026-05-28
 
 ### 概述

@@ -16,6 +16,12 @@ import { executeChat } from '@persist/runtime';
 import { assertMaxRegisteredTools } from '@persist/tool';
 import { writeRuntimeChunkSse } from './sse.js';
 
+function clampSessionListLimit(raw: unknown): number {
+  const n = parseInt(String(raw ?? ''), 10);
+  const v = Number.isFinite(n) ? n : 50;
+  return Math.min(200, Math.max(1, v));
+}
+
 export interface ApiDeps {
   store: SessionStore;
   memoryStore: MemoryStore;
@@ -50,6 +56,11 @@ export async function registerRoutes(app: FastifyInstance, deps: ApiDeps) {
     const input = body.success ? body.data : {};
     const session = await store.createSession(input);
     return reply.status(201).send(session);
+  });
+
+  app.get<{ Querystring: { limit?: string } }>('/api/sessions', async (request) => {
+    const limit = clampSessionListLimit(request.query.limit);
+    return store.listSessionSummaries({ limit });
   });
 
   app.get<{ Params: { id: string } }>('/api/sessions/:id', async (request, reply) => {

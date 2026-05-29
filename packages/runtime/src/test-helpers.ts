@@ -18,13 +18,22 @@ import type {
   Session,
   SessionReplay,
   SessionStore,
+  SessionSummary,
   SessionWithMessages,
   ToolExecutionSnapshot,
   ToolExecutionSnapshotStore,
 } from '@persist/shared';
+import { SESSION_PREVIEW_TEXT_MAX_LENGTH } from '@persist/shared';
+
+interface InMemorySessionRecord {
+  id: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export class InMemorySessionStore implements SessionStore {
-  private sessions = new Map<string, { id: string; messages: Message[] }>();
+  private sessions = new Map<string, InMemorySessionRecord>();
   private planSnapshots: PlanSnapshot[] = [];
   private toolSnapshots: ToolExecutionSnapshot[] = [];
 
@@ -38,27 +47,31 @@ export class InMemorySessionStore implements SessionStore {
 
   async createSession(_input: CreateSessionInput): Promise<Session> {
     const id = crypto.randomUUID();
-    this.sessions.set(id, { id, messages: [] });
     const now = new Date();
+    this.sessions.set(id, { id, messages: [], createdAt: now, updatedAt: now });
     return { id, createdAt: now, updatedAt: now };
   }
 
   async getSession(id: string): Promise<Session | null> {
     const s = this.sessions.get(id);
     if (!s) return null;
-    const now = new Date();
-    return { id: s.id, createdAt: now, updatedAt: now };
+    return { id: s.id, createdAt: s.createdAt, updatedAt: s.updatedAt };
   }
 
   async getSessionWithMessages(id: string): Promise<SessionWithMessages | null> {
     const s = this.sessions.get(id);
     if (!s) return null;
-    const now = new Date();
-    return { id: s.id, messages: [...s.messages], createdAt: now, updatedAt: now };
+    return {
+      id: s.id,
+      messages: [...s.messages],
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+    };
   }
 
   async appendMessage(sessionId: string, input: CreateMessageInput): Promise<Message> {
     const s = this.sessions.get(sessionId)!;
+    const now = new Date();
     const msg: Message = {
       id: input.id ?? crypto.randomUUID(),
       sessionId,
@@ -68,9 +81,10 @@ export class InMemorySessionStore implements SessionStore {
       toolName: input.toolName,
       providerMetadata: input.providerMetadata,
       completionState: input.completionState ?? 'completed',
-      createdAt: new Date(),
+      createdAt: now,
     };
     s.messages.push(msg);
+    s.updatedAt = now;
     return msg;
   }
 
@@ -84,7 +98,26 @@ export class InMemorySessionStore implements SessionStore {
     const s = this.sessions.get(sessionId)!;
     const idx = s.messages.findIndex((m) => m.id === messageId);
     s.messages[idx] = { ...s.messages[idx]!, ...patch };
+    s.updatedAt = new Date();
     return s.messages[idx]!;
+  }
+
+  async listSessionSummaries(options?: { limit?: number }): Promise<SessionSummary[]> {
+    const limit = options?.limit ?? 50;
+    return [...this.sessions.values()]
+      .filter((s) => s.messages.some((m) => m.role === 'user'))
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, limit)
+      .map((s) => {
+        const firstUser = s.messages.find((m) => m.role === 'user')!;
+        return {
+          id: s.id,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+          messageCount: s.messages.length,
+          previewText: firstUser.content.slice(0, SESSION_PREVIEW_TEXT_MAX_LENGTH),
+        };
+      });
   }
 
   async getReplay(sessionId: string): Promise<SessionReplay | null> {

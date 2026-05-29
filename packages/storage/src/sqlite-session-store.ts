@@ -1,4 +1,4 @@
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, desc, and, count, exists } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type {
   CreateMessageInput,
@@ -7,8 +7,10 @@ import type {
   Session,
   SessionReplay,
   SessionStore,
+  SessionSummary,
   SessionWithMessages,
 } from '@persist/shared';
+import { SESSION_PREVIEW_TEXT_MAX_LENGTH } from '@persist/shared';
 import type { ProviderMetadata } from '@persist/shared';
 import type { StreamCompletionState } from '@persist/shared';
 import * as schema from './schema.js';
@@ -202,6 +204,56 @@ export class SqliteSessionStore implements SessionStore {
       })),
       reconstructedAt: new Date(),
     };
+  }
+
+  async listSessionSummaries(options?: { limit?: number }): Promise<SessionSummary[]> {
+    const limit = options?.limit ?? 50;
+    const sessionRows = await this.db
+      .select()
+      .from(schema.sessions)
+      .where(
+        exists(
+          this.db
+            .select()
+            .from(schema.messages)
+            .where(
+              and(
+                eq(schema.messages.sessionId, schema.sessions.id),
+                eq(schema.messages.role, 'user'),
+              ),
+            ),
+        ),
+      )
+      .orderBy(desc(schema.sessions.updatedAt))
+      .limit(limit);
+
+    const summaries: SessionSummary[] = [];
+    for (const row of sessionRows) {
+      const [countRow] = await this.db
+        .select({ value: count() })
+        .from(schema.messages)
+        .where(eq(schema.messages.sessionId, row.id));
+
+      const [firstUser] = await this.db
+        .select({ content: schema.messages.content })
+        .from(schema.messages)
+        .where(and(eq(schema.messages.sessionId, row.id), eq(schema.messages.role, 'user')))
+        .orderBy(asc(schema.messages.createdAt))
+        .limit(1);
+
+      const previewText = firstUser?.content
+        ? firstUser.content.slice(0, SESSION_PREVIEW_TEXT_MAX_LENGTH)
+        : undefined;
+
+      summaries.push({
+        id: row.id,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        messageCount: countRow?.value ?? 0,
+        previewText,
+      });
+    }
+    return summaries;
   }
 
   private mapSession(row: typeof schema.sessions.$inferSelect): Session {

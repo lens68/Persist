@@ -42,3 +42,17 @@ export const SessionReplaySchema = z.object({
 });
 
 export type SessionReplay = z.infer<typeof SessionReplaySchema>;
+
+/** CFG-HISTORY-02 — first user message preview truncation for Sidebar title. */
+export const SESSION_PREVIEW_TEXT_MAX_LENGTH = 24;
+
+/** Lightweight session row for workspace list (no messages). */
+export const SessionSummarySchema = z.object({
+  id: z.string().uuid(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  messageCount: z.number().int().nonnegative(),
+  previewText: z.string().optional(),
+});
+
+export type SessionSummary = z.infer<typeof SessionSummarySchema>;

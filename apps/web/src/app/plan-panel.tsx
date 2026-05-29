@@ -29,6 +29,14 @@ export interface ReplayView {
   messages: Array<{ role: string; content: string }>;
   planSnapshots: PlanSnapshotView[];
   toolExecutionSnapshots: ToolSnapshotView[];
+  memories?: Array<{
+    id: string;
+    type: string;
+    content: string;
+    sourceMessageIds?: string[];
+    createdAt: string | Date;
+    supersededBy?: string;
+  }>;
 }
 
 interface PlanPanelProps {

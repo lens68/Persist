@@ -3,6 +3,7 @@ import type {
   CreateSessionInput,
   Session,
   SessionReplay,
+  SessionSummary,
   SessionWithMessages,
 } from '../types/session.js';
 
@@ -25,4 +26,6 @@ export interface SessionStore {
   ): Promise<Message>;
 
   getReplay(sessionId: string): Promise<SessionReplay | null>;
+
+  listSessionSummaries(options?: { limit?: number }): Promise<SessionSummary[]>;
 }

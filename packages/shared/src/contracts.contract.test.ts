@@ -5,6 +5,7 @@ import {
   RuntimeChunkSchema,
   SessionReplaySchema,
   SessionSchema,
+  SessionSummarySchema,
 } from './index.js';
 
 describe('shared contracts', () => {
@@ -65,5 +66,28 @@ describe('shared contracts', () => {
   it('validates create session input', () => {
     const input = CreateSessionInputSchema.parse({ title: 'Test' });
     expect(input.title).toBe('Test');
+  });
+
+  it('validates SessionSummary with optional previewText', () => {
+    const summary = SessionSummarySchema.parse({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      messageCount: 0,
+    });
+    expect(summary.previewText).toBeUndefined();
+    expect(summary.messageCount).toBe(0);
+  });
+
+  it('validates SessionSummary with previewText and messageCount', () => {
+    const summary = SessionSummarySchema.parse({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      messageCount: 3,
+      previewText: 'Hello world',
+    });
+    expect(summary.previewText).toBe('Hello world');
+    expect(summary.messageCount).toBe(3);
   });
 });

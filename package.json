@@ -2,7 +2,7 @@
   "name": "persist",
   "type": "module",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Persistent Runtime — Stateful Agent Runtime substrate",
   "scripts": {
     "build": "pnpm run build:packages && pnpm run build:apps",
